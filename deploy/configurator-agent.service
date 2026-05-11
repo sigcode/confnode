@@ -1,0 +1,16 @@
+[Unit]
+Description=Configurator Privileged Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/configurator-agent --config /etc/configurator/config.yaml
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

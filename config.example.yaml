@@ -1,0 +1,26 @@
+server:
+  port: 3001
+  # Generate with: openssl rand -hex 32
+  secret: "CHANGE_ME_generate_with_openssl_rand_hex_32"
+  # Path to built frontend (set in production)
+  # frontend_dist: /opt/configurator/frontend/dist
+
+apache:
+  # "debian" uses a2ensite/a2dissite; "arch" manages symlinks directly
+  mode: debian
+  sites_available: /etc/apache2/sites-available
+  sites_enabled: /etc/apache2/sites-enabled
+  default_webroot: /var/www
+
+php:
+  versions: ["8.1", "8.3", "8.4"]
+  default: "8.4"
+
+certbot:
+  email: admin@example.com
+
+database:
+  path: /var/lib/configurator/db.sqlite
+
+agent:
+  socket: /run/configurator-agent.sock

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.sqlite
+.env
+config.yaml
+agent/configurator-agent
