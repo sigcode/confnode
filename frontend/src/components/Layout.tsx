@@ -36,6 +36,7 @@ export default function Layout() {
   const apacheChanges = useAppSelector((s) => s.apache.changes);
   const activeBuild = useAppSelector((s) => s.build.active);
   const buildPanelOpen = useAppSelector((s) => s.build.panelOpen);
+  const buildQueue = useAppSelector((s) => s.build.queue);
   const [apachePanelOpen, setApachePanelOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -53,9 +54,9 @@ export default function Layout() {
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             {activeBuild && (
               <Chip
-                icon={<SyncIcon sx={activeBuild.status === "running" ? { animation: "spin 1s linear infinite", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } } : {}} />}
-                label={`Build: ${activeBuild.name}`}
-                color={activeBuild.status === "running" ? "info" : activeBuild.status === "success" ? "success" : "error"}
+                icon={<SyncIcon sx={(activeBuild.status === "running" || activeBuild.status === "queued") ? { animation: "spin 1s linear infinite", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } } : {}} />}
+                label={`Build: ${activeBuild.name}${buildQueue.filter(q => q.status === "queued").length > 0 ? ` (+${buildQueue.filter(q => q.status === "queued").length})` : ""}`}
+                color={activeBuild.status === "queued" ? "warning" : activeBuild.status === "running" ? "info" : activeBuild.status === "success" ? "success" : "error"}
                 size="small"
                 onClick={() => dispatch(openPanel())}
                 sx={{ cursor: "pointer", fontWeight: 600 }}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Box, Typography, Button, Table, TableHead, TableRow, TableCell,
-  TableBody, IconButton, Tooltip, Dialog, Chip, Stack,
+  TableBody, IconButton, Tooltip, Dialog, Chip, Stack, Badge,
   DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -13,7 +13,7 @@ import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import api from "../../api/client.js";
 import BuildForm from "./BuildForm.js";
 import BuildHistory from "./BuildHistory.js";
-import { runBuild } from "./buildStream.js";
+import { runBuild, loadQueue } from "./buildStream.js";
 import { openPanel } from "../../store/buildSlice.js";
 import { useAppDispatch, useAppSelector } from "../../store/index.js";
 
@@ -31,11 +31,14 @@ interface Build {
 export default function BuildList() {
   const dispatch = useAppDispatch();
   const activeBuild = useAppSelector((s) => s.build.active);
+  const queue = useAppSelector((s) => s.build.queue);
   const [builds, setBuilds] = useState<Build[]>([]);
   const [formTarget, setFormTarget] = useState<Build | null | "new">(null);
   const [historyTarget, setHistoryTarget] = useState<Build | null>(null);
   const [purgeTarget, setPurgeTarget] = useState<Build | null>(null);
   const [purging, setPurging] = useState(false);
+
+  useEffect(() => { loadQueue(); }, []);
 
   const load = async () => {
     const res = await api.get("/builds");
@@ -103,7 +106,14 @@ export default function BuildList() {
                         }
                       }}
                     >
-                      <PlayArrowIcon fontSize="small" />
+                      <Badge
+                        badgeContent={queue.find(q => q.buildId === b.id)?.status === "queued"
+                          ? queue.filter(q => q.status === "queued").findIndex(q => q.buildId === b.id) + 1
+                          : undefined}
+                        color="warning"
+                      >
+                        <PlayArrowIcon fontSize="small" />
+                      </Badge>
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="History">

@@ -8,6 +8,7 @@ import { existsSync } from "fs";
 
 import { loadConfig } from "./config.js";
 import { openDb } from "./db/schema.js";
+import { buildQueue } from "./buildQueue.js";
 import authRoutes, { ensureAdminUser } from "./routes/auth.js";
 import vhostRoutes from "./routes/vhosts.js";
 import buildRoutes from "./routes/builds.js";
@@ -50,6 +51,9 @@ await app.register(apacheRoutes, { cfg });
 await app.register(webhookRoutes, { db, cfg });
 await app.register(userRoutes, { db });
 await app.register(configRoutes, { db });
+
+// Initialize build queue (marks interrupted runs as failed, re-queues pending)
+buildQueue.loadFromDb(db, cfg.agent.socket, cfg);
 
 // Serve built frontend in production
 const __dirname = dirname(fileURLToPath(import.meta.url));

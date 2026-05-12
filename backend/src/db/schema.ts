@@ -18,6 +18,7 @@ export function openDb(path: string): Db {
 
 function runMigrations(db: Db) {
   try { db.exec("ALTER TABLE builds ADD COLUMN has_submodules INTEGER NOT NULL DEFAULT 0"); } catch {}
+  try { db.exec("ALTER TABLE build_runs ADD COLUMN queued_at TEXT"); } catch {}
 }
 
 function migrate(db: Db) {

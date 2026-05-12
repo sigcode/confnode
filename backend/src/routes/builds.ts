@@ -3,8 +3,7 @@ import { nanoid } from "nanoid";
 import { agentCall } from "../agent.js";
 import { Db } from "../db/schema.js";
 import { AppConfig } from "../config.js";
-import { getGitSSHKey, getGitTimeoutMs } from "./config.js";
-import { exec } from "child_process";
+import { buildQueue } from "../buildQueue.js";
 
 interface BuildBody {
   name: string;
@@ -68,97 +67,113 @@ export default async function buildRoutes(
     return { ok: true };
   });
 
-  // Trigger a build run — streams output via SSE
+  // Enqueue a build run — returns immediately with run_id and queue position
   app.post<{ Params: { id: string } }>("/api/builds/:id/run", async (req, reply) => {
     const build = db.prepare("SELECT * FROM builds WHERE id = ?").get(req.params.id) as any;
     if (!build) return reply.status(404).send({ error: "not found" });
+    const { runId, position } = buildQueue.enqueue(db, build);
+    return { run_id: runId, position };
+  });
+
+  // SSE stream for a specific build run
+  app.get<{ Params: { runId: string } }>("/api/builds/runs/:runId/stream", async (req, reply) => {
+    const runId = parseInt(req.params.runId, 10);
+    if (isNaN(runId)) return reply.status(400).send({ error: "invalid run id" });
 
     reply.raw.setHeader("Content-Type", "text/event-stream");
     reply.raw.setHeader("Cache-Control", "no-cache");
     reply.raw.flushHeaders();
 
-    const runRow = db.prepare(`
-      INSERT INTO build_runs (build_id, status, started_at) VALUES (?, 'running', datetime('now'))
-    `).run(build.id);
-    const runId = runRow.lastInsertRowid;
-
-    let fullOutput = "";
-    const send = (line: string) => {
-      fullOutput += line + "\n";
-      db.prepare("UPDATE build_runs SET output = ? WHERE id = ?").run(fullOutput, runId);
-      reply.raw.write(`data: ${JSON.stringify({ line })}\n\n`);
+    const sse = (data: object) => {
+      if (!reply.raw.writableEnded) {
+        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      }
     };
 
-    try {
-      send(`[${new Date().toISOString()}] Starting build: ${build.name}`);
-
-      // git pull or clone
-      const exists = await agentCall(socket, "systemd.status", { unit: "apache2" })
-        .then(() => true).catch(() => false); // just test agent is alive
-
-      const sshKey = getGitSSHKey(db);
-      const GIT_TIMEOUT = getGitTimeoutMs(db);
-
-      // Check if deploy_path exists → pull, else clone
-      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey }, GIT_TIMEOUT)
-        .catch(() => null);
-
-      if (!gitAction || !gitAction.ok) {
-        send("Directory not found or git pull failed, cloning...");
-        const cloneRes = await agentCall(socket, "git.clone", {
-          url: build.repo_url,
-          path: build.deploy_path,
-          ssh_key: sshKey,
-        }, GIT_TIMEOUT);
-        (cloneRes.output ?? "").split("\n").forEach(send);
-        if (!cloneRes.ok) throw new Error(cloneRes.error ?? "clone failed");
-      } else {
-        (gitAction.output ?? "").split("\n").forEach(send);
-      }
-
-      // Checkout branch
-      const checkoutRes = await agentCall(socket, "git.checkout", {
-        path: build.deploy_path,
-        branch: build.repo_branch,
-        ssh_key: sshKey,
-      }, GIT_TIMEOUT);
-      (checkoutRes.output ?? "").split("\n").forEach(send);
-
-      // Submodules
-      if (build.has_submodules) {
-        send("Updating submodules...");
-        const subRes = await agentCall(socket, "git.submodule_update", {
-          path: build.deploy_path,
-          ssh_key: sshKey,
-        }, GIT_TIMEOUT);
-        (subRes.output ?? "").split("\n").forEach(send);
-        if (!subRes.ok) throw new Error(subRes.error ?? "submodule update failed");
-      }
-
-      // Post command (runs directly in shell as web user — no privileged ops here)
-      if (build.post_command) {
-        send(`Running post command: ${build.post_command}`);
-        await runPostCommand(build.post_command, build.deploy_path, send);
-      }
-
-      db.prepare("UPDATE build_runs SET status='success', finished_at=datetime('now') WHERE id=?").run(runId);
-      send("[DONE] Build successful.");
-      reply.raw.write(`data: ${JSON.stringify({ status: "success" })}\n\n`);
-    } catch (e: any) {
-      db.prepare("UPDATE build_runs SET status='failed', finished_at=datetime('now') WHERE id=?").run(runId);
-      send(`[ERROR] ${e.message}`);
-      reply.raw.write(`data: ${JSON.stringify({ status: "failed" })}\n\n`);
+    const run = db.prepare("SELECT * FROM build_runs WHERE id = ?").get(runId) as any;
+    if (!run) {
+      sse({ error: "not found" });
+      reply.raw.end();
+      return;
     }
+
+    // Already finished — replay from DB and close
+    if (run.status === "success" || run.status === "failed") {
+      (run.output ?? "").split("\n").filter(Boolean).forEach((line: string) => sse({ line }));
+      sse({ status: run.status });
+      reply.raw.end();
+      return;
+    }
+
+    const emitter = buildQueue.getEmitter(runId);
+
+    if (run.status === "queued") {
+      const { c: ahead } = db.prepare(
+        "SELECT COUNT(*) as c FROM build_runs WHERE status IN ('queued','running') AND id < ?"
+      ).get(runId) as any;
+      sse({ queued: true, position: Number(ahead) + 1 });
+
+      // Subscribe before checking DB again to avoid race
+      let startedResolve!: () => void;
+      const startedPromise = new Promise<void>((resolve) => { startedResolve = resolve; });
+      emitter.once("started", startedResolve);
+
+      // Check if it already transitioned (race-free: event is registered above)
+      const fresh = db.prepare("SELECT status FROM build_runs WHERE id = ?").get(runId) as any;
+      if (fresh?.status === "queued") {
+        await Promise.race([
+          startedPromise,
+          new Promise<void>((resolve) => req.raw.once("close", resolve)),
+        ]);
+      } else {
+        emitter.off("started", startedResolve);
+      }
+
+      if (reply.raw.writableEnded) return;
+      sse({ running: true });
+    }
+
+    // Stream live output (status may have changed to 'running' at this point)
+    const current = db.prepare("SELECT output FROM build_runs WHERE id = ?").get(runId) as any;
+    (current?.output ?? "").split("\n").filter(Boolean).forEach((line: string) => sse({ line }));
+
+    await new Promise<void>((resolve) => {
+      const onLine = (line: string) => sse({ line });
+      const onStatus = (status: string) => {
+        sse({ status });
+        cleanup();
+        resolve();
+      };
+      const onClose = () => { cleanup(); resolve(); };
+
+      const cleanup = () => {
+        emitter.off("line", onLine);
+        emitter.off("status", onStatus);
+        req.raw.off("close", onClose);
+      };
+
+      emitter.on("line", onLine);
+      emitter.once("status", onStatus);
+      req.raw.once("close", onClose);
+
+      // If already finished between replay and subscribe, emit from DB
+      const check = db.prepare("SELECT status FROM build_runs WHERE id = ?").get(runId) as any;
+      if (check?.status === "success" || check?.status === "failed") {
+        onStatus(check.status);
+      }
+    });
 
     reply.raw.end();
   });
-}
 
-function runPostCommand(cmd: string, cwd: string, send: (l: string) => void): Promise<void> {
-  return new Promise((resolve) => {
-    const child = exec(cmd, { cwd, timeout: 300_000 });
-    child.stdout?.on("data", (d) => String(d).split("\n").forEach(send));
-    child.stderr?.on("data", (d) => String(d).split("\n").forEach(send));
-    child.on("close", () => resolve());
+  // Current queue state (running + waiting)
+  app.get("/api/builds/queue", async () => {
+    return db.prepare(`
+      SELECT br.id as run_id, br.build_id, b.name, br.status, br.queued_at
+      FROM build_runs br
+      JOIN builds b ON b.id = br.build_id
+      WHERE br.status IN ('queued', 'running')
+      ORDER BY br.id ASC
+    `).all();
   });
 }
