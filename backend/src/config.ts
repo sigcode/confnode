@@ -16,6 +16,7 @@ export interface AppConfig {
   php: {
     versions: string[];
     default: string;
+    fpm_units?: Record<string, string>;
   };
   certbot: {
     email: string;

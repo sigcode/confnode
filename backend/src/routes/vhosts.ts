@@ -153,7 +153,7 @@ export default async function vhostRoutes(
         return reply.status(400).send({ error: "domain, path and phpVersion required" });
 
       const name = domain.replace(/[^a-z0-9._-]/gi, "-").toLowerCase();
-      const content = generateVhostConfig(domain, path, phpVersion);
+      const content = generateVhostConfig(domain, path, phpVersion, cfg.apache.mode, cfg.php.fpm_units);
 
       const res = await agentCall(socket, "apache.write_vhost", { name, content });
       if (!res.ok) return reply.status(400).send({ error: res.error });
@@ -168,13 +168,24 @@ export default async function vhostRoutes(
   );
 }
 
-function generateVhostConfig(domain: string, path: string, phpVersion: string): string {
+function phpFpmSocket(version: string, apacheMode: string, fpmUnits?: Record<string, string>): string {
+  if (apacheMode !== "arch") return `/run/php/php${version}-fpm.sock`;
+  // On Arch, use fpm_units override if present, otherwise strip dot from version
+  const unit = fpmUnits?.[version] ?? `php${version.replace(".", "")}-fpm`;
+  return `/run/${unit}/${unit}.sock`;
+}
+
+function generateVhostConfig(domain: string, path: string, phpVersion: string, apacheMode: string, fpmUnits?: Record<string, string>): string {
+  const isArch = apacheMode === "arch";
+  const fpmSocket = phpFpmSocket(phpVersion, apacheMode, fpmUnits);
+  const logDir = isArch ? "/var/log/httpd" : "/var/log/apache2";
+
   return `<VirtualHost *:80>
     ServerName ${domain}
     DocumentRoot ${path}
 
     <FilesMatch \\.php$>
-        SetHandler "proxy:unix:/run/php/php${phpVersion}-fpm.sock|fcgi://localhost"
+        SetHandler "proxy:unix:${fpmSocket}|fcgi://localhost"
     </FilesMatch>
 
     <Directory ${path}>
@@ -183,8 +194,8 @@ function generateVhostConfig(domain: string, path: string, phpVersion: string): 
         Require all granted
     </Directory>
 
-    ErrorLog \${APACHE_LOG_DIR}/${domain}-error.log
-    CustomLog \${APACHE_LOG_DIR}/${domain}-access.log combined
+    ErrorLog ${logDir}/${domain}-error.log
+    CustomLog ${logDir}/${domain}-access.log combined
 </VirtualHost>
 `;
 }
