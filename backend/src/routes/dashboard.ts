@@ -10,13 +10,15 @@ export default async function dashboardRoutes(
 ) {
   const socket = cfg.agent.socket;
 
+  const apacheUnit = cfg.apache.mode === "arch" ? "httpd" : "apache2";
+
   app.get("/api/dashboard/status", async () => {
     const [apache, mysql, ...phpFpm] = await Promise.all([
-      agentCall(socket, "apache.configtest").then((r) => ({
-        name: "apache2",
-        active: r.ok,
+      agentCall(socket, "systemd.status", { unit: apacheUnit }).then((r) => ({
+        name: apacheUnit,
+        active: (r.output ?? "").trim() === "active",
         output: r.output ?? r.error,
-      })).catch(() => ({ name: "apache2", active: false, output: "unreachable" })),
+      })).catch(() => ({ name: apacheUnit, active: false, output: "unreachable" })),
 
       agentCall(socket, "mariadb.status").then((r) => ({
         name: "mariadb",
@@ -47,7 +49,7 @@ export default async function dashboardRoutes(
         return reply.status(400).send({ error: "invalid action" });
 
       let res;
-      if (service === "apache2") {
+      if (service === apacheUnit) {
         res = await agentCall(socket, `apache.${action}`);
       } else if (service === "mariadb") {
         res = await agentCall(socket, `mariadb.${action}`);

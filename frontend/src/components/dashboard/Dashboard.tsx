@@ -16,6 +16,7 @@ type Action = "start" | "stop" | "restart" | "reload";
 
 const ACTIONS: Record<string, Action[]> = {
   apache2: ["start", "restart", "reload", "stop"],
+  httpd: ["start", "restart", "reload", "stop"],
   mariadb: ["start", "restart", "stop"],
 };
 const phpFpmActions: Action[] = ["start", "restart"];
