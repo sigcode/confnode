@@ -62,7 +62,7 @@ export default function VhostEditor({ name, onDone }: Props) {
     }
   }, [name, isNew]);
 
-  const template = `<VirtualHost *:80>
+  const template = `<VirtualHost example.com:80>
     ServerName example.com
     DocumentRoot /var/www/example
 
