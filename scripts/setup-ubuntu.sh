@@ -87,12 +87,16 @@ apt-get install -y -qq \
   git curl wget rsync \
   software-properties-common
 
-# Node.js LTS (via NodeSource)
-if ! command -v node &>/dev/null || [[ $(node --version | grep -oP '\d+' | head -1) -lt 20 ]]; then
-  info "Installing Node.js 20 LTS..."
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - 2>/dev/null
+# Node.js 20 LTS (via NodeSource) — force install/upgrade if below v20
+NODE_MAJOR=0
+command -v node &>/dev/null && NODE_MAJOR=$(node --version 2>/dev/null | grep -oP '^\Kv?\K\d+' | head -1 || echo 0)
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  info "Installing Node.js 20 LTS (current: v${NODE_MAJOR:-none})..."
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   apt-get install -y -qq nodejs
+  hash -r  # refresh PATH cache
 fi
+info "Node.js: $(node --version)"
 
 # Go (Ubuntu 22.04 ships 1.18+; 24.04 ships 1.22 — both sufficient)
 # If too old, we download from go.dev
@@ -185,6 +189,8 @@ mkdir -p "$INSTALL_DIR/backend" "$INSTALL_DIR/frontend"
 rsync -a --delete "$BUILD_DIR/backend/dist/"        "$INSTALL_DIR/backend/dist/"
 rsync -a --delete "$BUILD_DIR/backend/node_modules/" "$INSTALL_DIR/backend/node_modules/"
 rsync -a --delete "$BUILD_DIR/frontend/dist/"        "$INSTALL_DIR/frontend/dist/"
+# package.json must be present so Node.js recognises the dist/ files as ESM ("type": "module")
+cp "$BUILD_DIR/backend/package.json" "$INSTALL_DIR/backend/package.json"
 
 info "Installed to $INSTALL_DIR"
 
@@ -279,6 +285,15 @@ if [[ $CREATE_VHOST -eq 1 ]]; then
 <VirtualHost *:80>
     ServerName $TOOL_DOMAIN
 
+    # Let certbot serve ACME challenges directly (not via proxy)
+    Alias /.well-known/ /var/www/html/.well-known/
+    <Directory /var/www/html/.well-known/>
+        Options None
+        AllowOverride None
+        Require all granted
+    </Directory>
+    ProxyPass /.well-known/ !
+
     ProxyPreserveHost On
     ProxyPass        / http://127.0.0.1:3001/
     ProxyPassReverse / http://127.0.0.1:3001/
@@ -334,5 +349,12 @@ echo "  To update confnode later, re-run this script."
 echo
 echo "  Service status:"
 systemctl is-active --quiet configurator-agent && echo -e "    configurator-agent  ${GREEN}active${NC}" || echo -e "    configurator-agent  ${RED}FAILED${NC}"
-systemctl is-active --quiet configurator       && echo -e "    configurator        ${GREEN}active${NC}" || echo -e "    configurator        ${RED}FAILED${NC}"
+if systemctl is-active --quiet configurator; then
+  echo -e "    configurator        ${GREEN}active${NC}"
+else
+  echo -e "    configurator        ${RED}FAILED${NC}"
+  echo
+  echo -e "${YELLOW}Last journal entries for configurator:${NC}"
+  journalctl -u configurator --no-pager -n 15 --output=short
+fi
 echo
