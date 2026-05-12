@@ -148,10 +148,28 @@ export default async function vhostRoutes(
 
       send("Starting certbot...");
       try {
-        const res = await agentCall(socket, "certbot.issue", { domain });
-        (res.output ?? "").split("\n").forEach(send);
-        if (!res.ok) send(`ERROR: ${res.error}`);
-        else send("SSL certificate issued successfully.");
+        const certRes = await agentCall(socket, "certbot.issue", { domain });
+        (certRes.output ?? "").split("\n").filter(Boolean).forEach(send);
+        if (!certRes.ok) {
+          send(`ERROR: ${certRes.error}`);
+        } else {
+          send("Certificate obtained. Patching vhost config...");
+          // Read current vhost content, append SSL block if not already present
+          const readRes = await agentCall(socket, "apache.read_vhost", { name: req.params.name });
+          if (readRes.ok && readRes.output && !/SSLCertificateFile/i.test(readRes.output)) {
+            const sslBlock = buildSslBlock(domain, readRes.output);
+            const updated = readRes.output.trimEnd() + "\n\n" + sslBlock + "\n";
+            const writeRes = await agentCall(socket, "apache.write_vhost", { name: req.params.name, content: updated });
+            if (!writeRes.ok) {
+              send(`ERROR patching vhost: ${writeRes.error}`);
+            } else {
+              await agentCall(socket, "apache.reload");
+              send("Vhost updated with SSL block. Apache reloaded.");
+            }
+          } else {
+            send("SSL block already present — skipped.");
+          }
+        }
       } catch (e: any) {
         send(`ERROR: ${e.message}`);
       }
@@ -182,6 +200,62 @@ export default async function vhostRoutes(
       return { ok: true, name };
     }
   );
+}
+
+// Builds an SSL VirtualHost block to append after a successful certbot run.
+// Detects whether the existing config is a reverse proxy or DocumentRoot vhost
+// and mirrors the relevant directives under :443.
+function buildSslBlock(domain: string, existingContent: string): string {
+  // Detect VirtualHost IP (e.g. "*" or "5.9.183.98") from the :80 directive
+  const vhMatch = existingContent.match(/<VirtualHost\s+([^:>]+):80>/i);
+  const ip = vhMatch ? vhMatch[1] : "*";
+
+  const certBase = `/etc/letsencrypt/live/${domain}`;
+  const isProxy = /ProxyPass\s+\/\s+http/i.test(existingContent);
+
+  if (isProxy) {
+    const ppMatch = existingContent.match(/ProxyPass\s+\/\s+(\S+)/i);
+    const pprMatch = existingContent.match(/ProxyPassReverse\s+\/\s+(\S+)/i);
+    const target = ppMatch?.[1] ?? "http://127.0.0.1:3000/";
+    const targetReverse = pprMatch?.[1] ?? target;
+    return `<VirtualHost ${ip}:443>
+    ServerName ${domain}
+
+    SSLEngine on
+    SSLCertificateFile      ${certBase}/fullchain.pem
+    SSLCertificateKeyFile   ${certBase}/privkey.pem
+    Include                 /etc/letsencrypt/options-ssl-apache.conf
+
+    ProxyPreserveHost On
+    ProxyPass        / ${target}
+    ProxyPassReverse / ${targetReverse}
+
+    ErrorLog  \${APACHE_LOG_DIR}/${domain}-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/${domain}-ssl-access.log combined
+</VirtualHost>`;
+  }
+
+  // DocumentRoot vhost
+  const drMatch = existingContent.match(/DocumentRoot\s+(\S+)/i);
+  const docRoot = drMatch?.[1] ?? `/var/www/${domain}`;
+  return `<VirtualHost ${ip}:443>
+    ServerName ${domain}
+    DocumentRoot ${docRoot}
+
+    SSLEngine on
+    SSLCertificateFile      ${certBase}/fullchain.pem
+    SSLCertificateKeyFile   ${certBase}/privkey.pem
+    Include                 /etc/letsencrypt/options-ssl-apache.conf
+
+    <Directory ${docRoot}>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog  \${APACHE_LOG_DIR}/${domain}-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/${domain}-ssl-access.log combined
+</VirtualHost>`;
 }
 
 function phpFpmSocket(version: string, apacheMode: string, fpmUnits?: Record<string, string>): string {
