@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import {
   Box, Typography, Button, Table, TableHead, TableRow, TableCell,
   TableBody, Chip, IconButton, Tooltip, Stack, Dialog,
+  DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import PowerIcon from "@mui/icons-material/Power";
 import PowerOffIcon from "@mui/icons-material/PowerOff";
 import api from "../../api/client.js";
@@ -21,6 +23,7 @@ export default function VhostList() {
   const [vhosts, setVhosts] = useState<Vhost[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const load = async () => {
     const res = await api.get("/vhosts");
@@ -31,6 +34,13 @@ export default function VhostList() {
 
   const toggle = async (name: string, enabled: boolean) => {
     await api.post(`/vhosts/${name}/toggle`, { enabled: !enabled });
+    load();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await api.delete(`/vhosts/${deleteTarget}`);
+    setDeleteTarget(null);
     load();
   };
 
@@ -83,6 +93,11 @@ export default function VhostList() {
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
+                  <Tooltip title="Delete">
+                    <IconButton size="small" color="error" onClick={() => setDeleteTarget(v.name)}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
               </TableCell>
             </TableRow>
@@ -98,6 +113,19 @@ export default function VhostList() {
         {editTarget !== null && (
           <VhostEditor name={editTarget} onDone={() => { setEditTarget(null); load(); }} />
         )}
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>Vhost löschen?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            <strong>{deleteTarget}</strong> wird deaktiviert und die Config-Datei gelöscht. Nicht rückgängig machbar.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Abbrechen</Button>
+          <Button color="error" variant="contained" onClick={confirmDelete}>Löschen</Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
