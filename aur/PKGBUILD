@@ -1,0 +1,96 @@
+# Maintainer: Simon Günther <sguenther@sigcode.de>
+pkgname=confnode-git
+pkgver=r0.HEAD
+pkgrel=1
+pkgdesc="Personal server administration tool — Apache/vhost management, builds, dashboard"
+arch=('x86_64')
+url="https://github.com/sigcode/confnode"
+license=('MIT')
+depends=(
+    'nodejs'
+    'apache'
+    'php-fpm'
+    'certbot'
+    'certbot-apache'
+    'git'
+)
+makedepends=(
+    'go'
+    'npm'
+)
+optdepends=(
+    'nginx: reverse proxy in front of the backend'
+    'mariadb: if you want MySQL service management in the dashboard'
+)
+backup=('etc/configurator/config.yaml')
+install=confnode.install
+source=("$pkgname::git+https://github.com/sigcode/confnode.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "$pkgname"
+
+    # Build Go agent
+    msg2 "Building configurator-agent..."
+    cd agent
+    go build -trimpath -ldflags="-s -w" -o configurator-agent .
+    cd ..
+
+    # Build backend (TypeScript → JS)
+    msg2 "Building backend..."
+    cd backend
+    npm ci --prefer-offline
+    npx tsc
+    cd ..
+
+    # Build frontend
+    msg2 "Building frontend..."
+    cd frontend
+    npm ci --prefer-offline
+    npm run build
+    cd ..
+}
+
+package() {
+    cd "$pkgname"
+
+    # Go agent binary
+    install -Dm755 agent/configurator-agent "$pkgdir/usr/bin/configurator-agent"
+
+    # Backend (compiled JS + node_modules)
+    install -dm755 "$pkgdir/usr/lib/configurator/backend"
+    cp -r backend/dist "$pkgdir/usr/lib/configurator/backend/dist"
+    cp -r backend/node_modules "$pkgdir/usr/lib/configurator/backend/node_modules"
+    cp backend/package.json "$pkgdir/usr/lib/configurator/backend/package.json"
+
+    # Frontend (built static files)
+    install -dm755 "$pkgdir/usr/lib/configurator/frontend"
+    cp -r frontend/dist "$pkgdir/usr/lib/configurator/frontend/dist"
+
+    # Default config (goes to /etc, gets backed up by pacman)
+    install -Dm644 config.example.yaml "$pkgdir/etc/configurator/config.yaml"
+
+    # Systemd service files
+    install -Dm644 deploy/configurator-agent.service \
+        "$pkgdir/usr/lib/systemd/system/configurator-agent.service"
+    install -Dm644 deploy/configurator.service \
+        "$pkgdir/usr/lib/systemd/system/configurator.service"
+
+    # Patch service file: point to correct install paths
+    sed -i \
+        's|/opt/configurator/backend|/usr/lib/configurator/backend|g' \
+        "$pkgdir/usr/lib/systemd/system/configurator.service"
+    sed -i \
+        's|ExecStart=/usr/bin/node /usr/lib/configurator/backend/dist/server.js|ExecStart=/usr/bin/node /usr/lib/configurator/backend/dist/server.js|g' \
+        "$pkgdir/usr/lib/systemd/system/configurator.service"
+
+    # Tell backend where the frontend is
+    sed -i \
+        's|# frontend_dist:.*|frontend_dist: /usr/lib/configurator/frontend/dist|g' \
+        "$pkgdir/etc/configurator/config.yaml"
+}
