@@ -39,6 +39,9 @@ func apacheEnableSiteArch(cfg *config.Config, name string) (string, error) {
 	if _, err := os.Stat(src); err != nil {
 		return "", fmt.Errorf("site config not found: %s", src)
 	}
+	if err := os.MkdirAll(cfg.Apache.SitesEnabled, 0755); err != nil {
+		return "", fmt.Errorf("cannot create sites-enabled dir: %v", err)
+	}
 	os.Remove(dst) // remove stale symlink if exists
 	if err := os.Symlink(src, dst); err != nil {
 		return "", fmt.Errorf("failed to enable site: %v", err)
@@ -54,10 +57,14 @@ func apacheDisableSiteArch(cfg *config.Config, name string) (string, error) {
 	return fmt.Sprintf("disabled %s", name), nil
 }
 
-func ApacheControl(action string) (string, error) {
+func ApacheControl(cfg *config.Config, action string) (string, error) {
 	switch action {
 	case "reload", "restart", "start", "stop":
-		return runCmd("systemctl", action, "apache2")
+		unit := "apache2"
+		if cfg.Apache.Mode == "arch" {
+			unit = "httpd"
+		}
+		return runCmd("systemctl", action, unit)
 	default:
 		return "", fmt.Errorf("invalid apache action: %q", action)
 	}
@@ -85,6 +92,9 @@ func ApacheWriteVhost(cfg *config.Config, name, content string) (string, error) 
 	}
 	if content == "" {
 		return "", fmt.Errorf("content must not be empty")
+	}
+	if err := os.MkdirAll(cfg.Apache.SitesAvailable, 0755); err != nil {
+		return "", fmt.Errorf("cannot create sites-available dir: %v", err)
 	}
 	path := filepath.Join(cfg.Apache.SitesAvailable, name+".conf")
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {

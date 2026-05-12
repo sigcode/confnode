@@ -15,10 +15,14 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 		return ApacheEnableSite(cfg, p("name"))
 	case "apache.disable_site":
 		return ApacheDisableSite(cfg, p("name"))
+	case "apache.start":
+		return ApacheControl(cfg, "start")
+	case "apache.stop":
+		return ApacheControl(cfg, "stop")
 	case "apache.reload":
-		return ApacheControl("reload")
+		return ApacheControl(cfg, "reload")
 	case "apache.restart":
-		return ApacheControl("restart")
+		return ApacheControl(cfg, "restart")
 	case "apache.configtest":
 		return ApacheConfigtest()
 	case "apache.read_vhost":
