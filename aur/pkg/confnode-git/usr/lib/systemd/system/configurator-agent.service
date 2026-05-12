@@ -1,0 +1,17 @@
+[Unit]
+Description=Configurator Privileged Agent
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/configurator-agent --config /etc/configurator/config.yaml
+ExecStartPost=/bin/sh -c 'sleep 0.5; chown root:configurator /run/configurator-agent.sock'
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

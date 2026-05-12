@@ -13,6 +13,7 @@ import vhostRoutes from "./routes/vhosts.js";
 import buildRoutes from "./routes/builds.js";
 import dashboardRoutes from "./routes/dashboard.js";
 import webhookRoutes from "./routes/webhook.js";
+import settingsRoutes from "./routes/settings.js";
 
 const CONFIG_PATH = process.env.CONFIG_PATH ?? "/etc/configurator/config.yaml";
 const cfg = loadConfig(CONFIG_PATH);
@@ -44,6 +45,7 @@ await app.register(vhostRoutes, { db, cfg });
 await app.register(buildRoutes, { db, cfg });
 await app.register(dashboardRoutes, { cfg });
 await app.register(webhookRoutes, { db, cfg });
+await app.register(settingsRoutes, { db });
 
 // Serve built frontend in production
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -11,6 +11,7 @@ import Login from "./components/Login.js";
 import Dashboard from "./components/dashboard/Dashboard.js";
 import VhostList from "./components/vhosts/VhostList.js";
 import BuildList from "./components/builds/BuildList.js";
+import Settings from "./components/Settings.js";
 
 const theme = createTheme({
   palette: {
@@ -43,6 +44,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/vhosts" element={<VhostList />} />
         <Route path="/builds" element={<BuildList />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   );
