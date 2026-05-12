@@ -12,6 +12,7 @@ import authRoutes, { ensureAdminUser } from "./routes/auth.js";
 import vhostRoutes from "./routes/vhosts.js";
 import buildRoutes from "./routes/builds.js";
 import dashboardRoutes from "./routes/dashboard.js";
+import apacheRoutes from "./routes/apache.js";
 import webhookRoutes from "./routes/webhook.js";
 import settingsRoutes from "./routes/settings.js";
 
@@ -44,6 +45,7 @@ await app.register(authRoutes, { db });
 await app.register(vhostRoutes, { db, cfg });
 await app.register(buildRoutes, { db, cfg });
 await app.register(dashboardRoutes, { cfg });
+await app.register(apacheRoutes, { cfg });
 await app.register(webhookRoutes, { db, cfg });
 await app.register(settingsRoutes, { db });
 

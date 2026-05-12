@@ -1,10 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
 import { useDispatch, useSelector } from "react-redux";
 import authReducer from "./authSlice.js";
+import apacheReducer from "./apacheSlice.js";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    apache: apacheReducer,
   },
 });
 

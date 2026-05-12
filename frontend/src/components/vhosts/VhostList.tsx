@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useAppDispatch } from "../../store/index.js";
+import { addChange } from "../../store/apacheSlice.js";
 import {
   Box, Typography, Button, Table, TableHead, TableRow, TableCell,
   TableBody, Chip, IconButton, Tooltip, Stack, Dialog,
@@ -20,6 +22,7 @@ interface Vhost {
 }
 
 export default function VhostList() {
+  const dispatch = useAppDispatch();
   const [vhosts, setVhosts] = useState<Vhost[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<string | null>(null);
@@ -34,12 +37,14 @@ export default function VhostList() {
 
   const toggle = async (name: string, enabled: boolean) => {
     await api.post(`/vhosts/${name}/toggle`, { enabled: !enabled });
+    dispatch(addChange({ name, action: enabled ? "disabled" : "enabled" }));
     load();
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     await api.delete(`/vhosts/${deleteTarget}`);
+    dispatch(addChange({ name: deleteTarget, action: "deleted" }));
     setDeleteTarget(null);
     load();
   };

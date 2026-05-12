@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAppDispatch } from "../../store/index.js";
+import { addChange } from "../../store/apacheSlice.js";
 import {
   DialogTitle, DialogContent, DialogActions, Button, TextField,
   MenuItem, FormControlLabel, Checkbox, Box, Typography, Alert,
@@ -20,6 +22,7 @@ export default function VhostWizard({ onDone }: Props) {
     description: "",
     ssl: false,
   });
+  const dispatch = useAppDispatch();
   const [sslLog, setSslLog] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +45,7 @@ export default function VhostWizard({ onDone }: Props) {
 
       // Enable site automatically
       await api.post(`/vhosts/${name}/toggle`, { enabled: true });
+      dispatch(addChange({ name, action: "created" }));
 
       if (form.ssl) {
         setStep("ssl");

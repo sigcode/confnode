@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useAppDispatch } from "../../store/index.js";
+import { addChange } from "../../store/apacheSlice.js";
 import {
   DialogTitle, DialogContent, DialogActions, Button, TextField,
   Box, Alert, LinearProgress, MenuItem,
@@ -14,6 +16,7 @@ interface Props {
 }
 
 export default function VhostEditor({ name, onDone }: Props) {
+  const dispatch = useAppDispatch();
   const isNew = name === "";
   const [vhostName, setVhostName] = useState(name);
   const [content, setContent] = useState("");
@@ -43,6 +46,7 @@ export default function VhostEditor({ name, onDone }: Props) {
     setError(null);
     try {
       await api.put(`/vhosts/${vhostName}`, { content, description });
+      dispatch(addChange({ name: vhostName, action: isNew ? "created" : "config updated" }));
       onDone();
     } catch (e: any) {
       setError(e.response?.data?.error ?? e.message);
@@ -55,6 +59,7 @@ export default function VhostEditor({ name, onDone }: Props) {
     setSaving(true);
     try {
       await api.post(`/vhosts/${vhostName}/php-version`, { version: phpVersion });
+      dispatch(addChange({ name: vhostName, action: "php version changed" }));
       const res = await api.get(`/vhosts/${vhostName}`);
       setContent(res.data.content);
     } catch (e: any) {

@@ -1,15 +1,18 @@
+import { useState } from "react";
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  AppBar, Toolbar, Typography, IconButton, Tooltip, Divider,
+  AppBar, Toolbar, Typography, IconButton, Tooltip, Divider, Chip,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import DnsIcon from "@mui/icons-material/Dns";
 import BuildIcon from "@mui/icons-material/Build";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/index.js";
 import { logout } from "../store/authSlice.js";
+import ApachePanel from "./apache/ApachePanel.js";
 
 const DRAWER_WIDTH = 220;
 
@@ -25,6 +28,8 @@ export default function Layout() {
   const loc = useLocation();
   const dispatch = useAppDispatch();
   const user = useAppSelector((s) => s.auth.user);
+  const apacheChanges = useAppSelector((s) => s.apache.changes);
+  const [apachePanelOpen, setApachePanelOpen] = useState(false);
 
   const handleLogout = async () => {
     await dispatch(logout());
@@ -38,7 +43,17 @@ export default function Layout() {
           <Typography variant="h6" fontWeight={700} letterSpacing={1}>
             Configurator
           </Typography>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            {apacheChanges.length > 0 && (
+              <Chip
+                icon={<WarningAmberIcon />}
+                label={`Apache pending (${apacheChanges.length})`}
+                color="warning"
+                size="small"
+                onClick={() => setApachePanelOpen(true)}
+                sx={{ cursor: "pointer", fontWeight: 600 }}
+              />
+            )}
             <Typography variant="body2" sx={{ opacity: 0.7 }}>{user?.username}</Typography>
             <Tooltip title="Logout">
               <IconButton color="inherit" onClick={handleLogout} size="small">
@@ -75,6 +90,8 @@ export default function Layout() {
       <Box component="main" sx={{ flexGrow: 1, p: 3, pt: 10, ml: `${DRAWER_WIDTH}px` }}>
         <Outlet />
       </Box>
+
+      <ApachePanel open={apachePanelOpen} onClose={() => setApachePanelOpen(false)} />
     </Box>
   );
 }
