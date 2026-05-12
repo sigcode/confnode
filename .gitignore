@@ -4,3 +4,6 @@ dist/
 .env
 config.yaml
 agent/configurator-agent
+aur/src/
+aur/pkg/
+aur/*.pkg.tar.zst
