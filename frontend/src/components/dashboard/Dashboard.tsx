@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Grid, Card, CardContent, Typography, Chip, Button, Box,
-  CircularProgress, Stack,
+  CircularProgress, Stack, Snackbar, Alert,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import api from "../../api/client.js";
@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     setLoading(true);
@@ -44,8 +45,11 @@ export default function Dashboard() {
   const control = async (service: string, action: Action) => {
     setActing(`${service}-${action}`);
     try {
-      await api.post("/dashboard/control", { service, action });
+      const res = await api.post("/dashboard/control", { service, action });
+      if (res.data?.error) setError(res.data.error);
       await fetchStatus();
+    } catch (e: any) {
+      setError(e.response?.data?.error ?? e.message ?? "unknown error");
     } finally {
       setActing(null);
     }
@@ -59,6 +63,11 @@ export default function Dashboard() {
 
   return (
     <Box>
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>
+      </Snackbar>
+
       <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
         <Typography variant="h5" fontWeight={600}>Dashboard</Typography>
         <Button startIcon={<RefreshIcon />} size="small" onClick={fetchStatus} disabled={loading}>
