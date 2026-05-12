@@ -17,6 +17,9 @@ php:
 certbot:
   email: dev@localhost
 
+git:
+  # ssh_key: /root/.ssh/id_ed25519
+
 database:
   path: /tmp/confnode-dev/db.sqlite
 

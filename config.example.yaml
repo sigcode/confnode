@@ -23,6 +23,11 @@ php:
 certbot:
   email: admin@example.com
 
+git:
+  # SSH private key for git clone/pull (used when repo URL is git@...)
+  # The key must be readable by the agent process (runs as root).
+  # ssh_key: /root/.ssh/id_ed25519
+
 database:
   path: /var/lib/configurator/db.sqlite
 

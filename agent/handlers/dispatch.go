@@ -54,11 +54,11 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 
 	// Git
 	case "git.clone":
-		return GitClone(p("url"), p("path"))
+		return GitClone(cfg, p("url"), p("path"))
 	case "git.pull":
-		return GitPull(p("path"))
+		return GitPull(cfg, p("path"))
 	case "git.checkout":
-		return GitCheckout(p("path"), p("branch"))
+		return GitCheckout(cfg, p("path"), p("branch"))
 
 	// Systemd (generic)
 	case "systemd.status":

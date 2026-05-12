@@ -10,7 +10,12 @@ type Config struct {
 	Apache  ApacheConfig  `yaml:"apache"`
 	PHP     PHPConfig     `yaml:"php"`
 	Certbot CertbotConfig `yaml:"certbot"`
+	Git     GitConfig     `yaml:"git"`
 	Agent   AgentConfig   `yaml:"agent"`
+}
+
+type GitConfig struct {
+	SSHKeyPath string `yaml:"ssh_key"` // path to private key, e.g. /root/.ssh/id_ed25519
 }
 
 type ApacheConfig struct {

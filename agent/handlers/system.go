@@ -6,6 +6,28 @@ import (
 	"os/exec"
 )
 
+// runGitCmd runs a git command with an optional SSH key injected via GIT_SSH_COMMAND.
+func runGitCmd(dir, sshKey string, args ...string) (string, error) {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	if sshKey != "" {
+		cmd.Env = append(cmd.Environ(),
+			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=accept-new -o BatchMode=yes", sshKey),
+		)
+	}
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
+	output := out.String()
+	if err != nil {
+		return output, fmt.Errorf("command failed: %v\n%s", err, output)
+	}
+	return output, nil
+}
+
 // runCmd executes a whitelisted command with validated arguments and returns combined stdout+stderr.
 func runCmd(name string, args ...string) (string, error) {
 	cmd := exec.Command(name, args...)
