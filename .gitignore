@@ -7,3 +7,4 @@ agent/configurator-agent
 aur/src/
 aur/pkg/
 aur/*.pkg.tar.zst
+aur/confnode-git/
