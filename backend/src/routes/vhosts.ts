@@ -157,7 +157,7 @@ export default async function vhostRoutes(
           // Read current vhost content, append SSL block if not already present
           const readRes = await agentCall(socket, "apache.read_vhost", { name: req.params.name });
           if (readRes.ok && readRes.output && !/SSLCertificateFile/i.test(readRes.output)) {
-            const sslBlock = buildSslBlock(domain, readRes.output);
+            const sslBlock = buildSslBlock(domain, readRes.output, sitesAvail);
             const updated = readRes.output.trimEnd() + "\n\n" + sslBlock + "\n";
             const writeRes = await agentCall(socket, "apache.write_vhost", { name: req.params.name, content: updated });
             if (!writeRes.ok) {
@@ -202,13 +202,33 @@ export default async function vhostRoutes(
   );
 }
 
+// Returns the predominant IP used in existing :443 VirtualHost directives.
+// Needed so new SSL blocks join the same NameVirtualHost group as existing ones.
+function detectSslIp(sitesAvail: string): string {
+  const counts: Record<string, number> = {};
+  try {
+    const files = readdirSync(sitesAvail).filter((f) => f.endsWith(".conf"));
+    for (const f of files) {
+      try {
+        const c = readFileSync(join(sitesAvail, f), "utf8");
+        for (const m of c.matchAll(/<VirtualHost\s+([^:>]+):443>/gi)) {
+          const ip = m[1].trim();
+          counts[ip] = (counts[ip] ?? 0) + 1;
+        }
+      } catch {}
+    }
+  } catch {}
+  // Pick the most common non-wildcard IP, fall back to "*"
+  const ips = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const specific = ips.find(([ip]) => ip !== "*");
+  return specific ? specific[0] : (ips[0]?.[0] ?? "*");
+}
+
 // Builds an SSL VirtualHost block to append after a successful certbot run.
 // Detects whether the existing config is a reverse proxy or DocumentRoot vhost
 // and mirrors the relevant directives under :443.
-function buildSslBlock(domain: string, existingContent: string): string {
-  // Detect VirtualHost IP (e.g. "*" or "5.9.183.98") from the :80 directive
-  const vhMatch = existingContent.match(/<VirtualHost\s+([^:>]+):80>/i);
-  const ip = vhMatch ? vhMatch[1] : "*";
+function buildSslBlock(domain: string, existingContent: string, sitesAvail: string): string {
+  const ip = detectSslIp(sitesAvail);
 
   const certBase = `/etc/letsencrypt/live/${domain}`;
   const isProxy = /ProxyPass\s+\/\s+http/i.test(existingContent);
