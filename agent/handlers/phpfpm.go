@@ -10,7 +10,11 @@ import (
 
 // phpFPMUnit returns the systemd unit name for a PHP-FPM version.
 // Arch: php81-fpm (no dot), Debian/Ubuntu: php8.1-fpm (with dot).
+// fpm_units in config can override the auto-generated name per version.
 func phpFPMUnit(cfg *config.Config, version string) string {
+	if unit, ok := cfg.PHP.FpmUnits[version]; ok {
+		return unit
+	}
 	if cfg.Apache.Mode == "arch" {
 		return fmt.Sprintf("php%s-fpm", strings.ReplaceAll(version, ".", ""))
 	}

@@ -21,8 +21,9 @@ type ApacheConfig struct {
 }
 
 type PHPConfig struct {
-	Versions []string `yaml:"versions"`
-	Default  string   `yaml:"default"`
+	Versions []string          `yaml:"versions"`
+	Default  string            `yaml:"default"`
+	FpmUnits map[string]string `yaml:"fpm_units"` // version → unit name override
 }
 
 type CertbotConfig struct {
