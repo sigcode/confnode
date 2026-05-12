@@ -7,7 +7,14 @@ import (
 	"github.com/sigcode/confnode/agent/validator"
 )
 
-func GitClone(cfg *config.Config, url, path string) (string, error) {
+func resolveSSHKey(cfg *config.Config, override string) string {
+	if strings.TrimSpace(override) != "" {
+		return strings.TrimSpace(override)
+	}
+	return cfg.Git.SSHKeyPath
+}
+
+func GitClone(cfg *config.Config, url, path, sshKeyOverride string) (string, error) {
 	url = strings.TrimSpace(url)
 	if err := validator.ValidateGitURL(url); err != nil {
 		return "", err
@@ -15,22 +22,22 @@ func GitClone(cfg *config.Config, url, path string) (string, error) {
 	if err := validator.ValidateDeployPath(path); err != nil {
 		return "", err
 	}
-	return runGitCmd("", cfg.Git.SSHKeyPath, "clone", url, path)
+	return runGitCmd("", resolveSSHKey(cfg, sshKeyOverride), "clone", url, path)
 }
 
-func GitPull(cfg *config.Config, path string) (string, error) {
+func GitPull(cfg *config.Config, path, sshKeyOverride string) (string, error) {
 	if err := validator.ValidateDeployPath(path); err != nil {
 		return "", err
 	}
-	return runGitCmd(path, cfg.Git.SSHKeyPath, "pull")
+	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "pull")
 }
 
-func GitCheckout(cfg *config.Config, path, branch string) (string, error) {
+func GitCheckout(cfg *config.Config, path, branch, sshKeyOverride string) (string, error) {
 	if err := validator.ValidateDeployPath(path); err != nil {
 		return "", err
 	}
 	if branch == "" {
 		return "", errorf("branch must not be empty")
 	}
-	return runGitCmd(path, cfg.Git.SSHKeyPath, "checkout", branch)
+	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "checkout", branch)
 }

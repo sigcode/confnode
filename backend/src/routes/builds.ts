@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { agentCall } from "../agent.js";
 import { Db } from "../db/schema.js";
 import { AppConfig } from "../config.js";
+import { getGitSSHKey } from "./config.js";
 import { exec } from "child_process";
 
 interface BuildBody {
@@ -85,8 +86,10 @@ export default async function buildRoutes(
       const exists = await agentCall(socket, "systemd.status", { unit: "apache2" })
         .then(() => true).catch(() => false); // just test agent is alive
 
+      const sshKey = getGitSSHKey(db);
+
       // Check if deploy_path exists → pull, else clone
-      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path })
+      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey })
         .catch(() => null);
 
       if (!gitAction || !gitAction.ok) {
@@ -94,6 +97,7 @@ export default async function buildRoutes(
         const cloneRes = await agentCall(socket, "git.clone", {
           url: build.repo_url,
           path: build.deploy_path,
+          ssh_key: sshKey,
         });
         (cloneRes.output ?? "").split("\n").forEach(send);
         if (!cloneRes.ok) throw new Error(cloneRes.error ?? "clone failed");
@@ -105,6 +109,7 @@ export default async function buildRoutes(
       const checkoutRes = await agentCall(socket, "git.checkout", {
         path: build.deploy_path,
         branch: build.repo_branch,
+        ssh_key: sshKey,
       });
       (checkoutRes.output ?? "").split("\n").forEach(send);
 

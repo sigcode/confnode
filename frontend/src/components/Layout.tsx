@@ -7,6 +7,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import DnsIcon from "@mui/icons-material/Dns";
 import BuildIcon from "@mui/icons-material/Build";
 import PeopleIcon from "@mui/icons-material/People";
+import TuneIcon from "@mui/icons-material/Tune";
 import LogoutIcon from "@mui/icons-material/Logout";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
@@ -21,6 +22,7 @@ const NAV = [
   { label: "Vhosts", icon: <DnsIcon />, path: "/vhosts" },
   { label: "Builds", icon: <BuildIcon />, path: "/builds" },
   { label: "Users", icon: <PeopleIcon />, path: "/users" },
+  { label: "Config", icon: <TuneIcon />, path: "/config" },
 ];
 
 export default function Layout() {
