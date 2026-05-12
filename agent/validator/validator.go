@@ -57,6 +57,7 @@ func ValidateDomain(domain string) error {
 
 // ValidateGitURL allows only http(s) and git+ssh URLs.
 func ValidateGitURL(url string) error {
+	url = strings.TrimSpace(url)
 	if strings.HasPrefix(url, "https://") ||
 		strings.HasPrefix(url, "http://") ||
 		strings.HasPrefix(url, "git@") {

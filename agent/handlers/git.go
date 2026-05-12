@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/sigcode/confnode/agent/validator"
 )
 
 func GitClone(url, path string) (string, error) {
+	url = strings.TrimSpace(url)
 	if err := validator.ValidateGitURL(url); err != nil {
 		return "", err
 	}
