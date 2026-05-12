@@ -84,7 +84,14 @@ export default function VhostList() {
         setSslDone(true);
         load();
       } else {
-        setSslLines((l) => [...l, data.line]);
+        setSslLines((l) => {
+          const next = [...l, data.line];
+          // Auto-close 2s after success (no ERROR lines)
+          if (data.line.includes("Apache reloaded") && !next.some((s) => s.startsWith("ERROR"))) {
+            setTimeout(() => setSslTarget(null), 2000);
+          }
+          return next;
+        });
       }
     };
     es.onerror = () => {
