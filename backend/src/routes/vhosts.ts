@@ -148,17 +148,21 @@ export default async function vhostRoutes(
 
       send("Starting certbot...");
       try {
-        const certRes = await agentCall(socket, "certbot.issue", { domain });
+        // Read vhost once — need both webroot and content for SSL patching
+        const readRes = await agentCall(socket, "apache.read_vhost", { name: req.params.name });
+        const vhostContent = readRes.output ?? "";
+        const drMatch = vhostContent.match(/^\s*DocumentRoot\s+(\S+)/m);
+        const webroot = drMatch ? drMatch[1] : "/var/www/html";
+
+        const certRes = await agentCall(socket, "certbot.issue", { domain, webroot });
         (certRes.output ?? "").split("\n").filter(Boolean).forEach(send);
         if (!certRes.ok) {
           send(`ERROR: ${certRes.error}`);
         } else {
           send("Certificate obtained. Patching vhost config...");
-          // Read current vhost content, append SSL block if not already present
-          const readRes = await agentCall(socket, "apache.read_vhost", { name: req.params.name });
-          if (readRes.ok && readRes.output && !/SSLCertificateFile/i.test(readRes.output)) {
-            const sslBlock = buildSslBlock(domain, readRes.output);
-            const updated = readRes.output.trimEnd() + "\n\n" + sslBlock + "\n";
+          if (readRes.ok && vhostContent && !/SSLCertificateFile/i.test(vhostContent)) {
+            const sslBlock = buildSslBlock(domain, vhostContent);
+            const updated = vhostContent.trimEnd() + "\n\n" + sslBlock + "\n";
             const writeRes = await agentCall(socket, "apache.write_vhost", { name: req.params.name, content: updated });
             if (!writeRes.ok) {
               send(`ERROR patching vhost: ${writeRes.error}`);

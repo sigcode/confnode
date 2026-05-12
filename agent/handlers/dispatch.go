@@ -50,7 +50,7 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 
 	// Certbot
 	case "certbot.issue":
-		return CertbotIssue(cfg, p("domain"))
+		return CertbotIssue(cfg, p("domain"), p("webroot"))
 
 	// Git
 	case "git.clone":
