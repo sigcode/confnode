@@ -30,19 +30,20 @@ func ValidatePHPVersion(version string, allowed []string) error {
 	return fmt.Errorf("PHP version %q not in allowed list: %s", version, strings.Join(allowed, ", "))
 }
 
-// ValidateDeployPath ensures a deployment path is under /var/www/.
-func ValidateDeployPath(path string) error {
+// ValidateDeployPath ensures a deployment path is under one of the allowed roots.
+func ValidateDeployPath(path string, allowedRoots []string) error {
 	if path == "" {
 		return fmt.Errorf("deploy path must not be empty")
 	}
-	if !strings.HasPrefix(path, "/var/www/") {
-		return fmt.Errorf("deploy path %q must be under /var/www/", path)
-	}
-	// Prevent path traversal
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("deploy path must not contain '..'")
 	}
-	return nil
+	for _, root := range allowedRoots {
+		if strings.HasPrefix(path, root) {
+			return nil
+		}
+	}
+	return fmt.Errorf("deploy path %q must be under one of: %s", path, strings.Join(allowedRoots, ", "))
 }
 
 // ValidateDomain ensures a domain looks like a valid hostname.

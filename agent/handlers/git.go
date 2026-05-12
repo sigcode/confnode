@@ -22,7 +22,7 @@ func GitClone(cfg *config.Config, url, path, sshKeyOverride string) (string, err
 	if err := validator.ValidateGitURL(url); err != nil {
 		return "", err
 	}
-	if err := validator.ValidateDeployPath(path); err != nil {
+	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -32,14 +32,14 @@ func GitClone(cfg *config.Config, url, path, sshKeyOverride string) (string, err
 }
 
 func GitPull(cfg *config.Config, path, sshKeyOverride string) (string, error) {
-	if err := validator.ValidateDeployPath(path); err != nil {
+	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
 		return "", err
 	}
 	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "pull")
 }
 
 func GitCheckout(cfg *config.Config, path, branch, sshKeyOverride string) (string, error) {
-	if err := validator.ValidateDeployPath(path); err != nil {
+	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
 		return "", err
 	}
 	if branch == "" {

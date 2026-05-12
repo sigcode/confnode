@@ -15,7 +15,8 @@ type Config struct {
 }
 
 type GitConfig struct {
-	SSHKeyPath string `yaml:"ssh_key"` // path to private key, e.g. /root/.ssh/id_ed25519
+	SSHKeyPath  string   `yaml:"ssh_key"`      // path to private key, e.g. /root/.ssh/id_ed25519
+	DeployRoots []string `yaml:"deploy_roots"` // allowed deploy path prefixes
 }
 
 type ApacheConfig struct {
@@ -73,5 +74,8 @@ func setDefaults(cfg *Config) {
 	}
 	if cfg.PHP.Default == "" {
 		cfg.PHP.Default = "8.4"
+	}
+	if len(cfg.Git.DeployRoots) == 0 {
+		cfg.Git.DeployRoots = []string{"/var/www/", "/srv/http/", "/srv/"}
 	}
 }
