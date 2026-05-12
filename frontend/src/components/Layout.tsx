@@ -13,6 +13,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import SyncIcon from "@mui/icons-material/Sync";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/index.js";
+import logo from "../assets/logo.svg";
 import { logout } from "../store/authSlice.js";
 import { openPanel } from "../store/buildSlice.js";
 import ApachePanel from "./apache/ApachePanel.js";
@@ -48,9 +49,10 @@ export default function Layout() {
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <AppBar position="fixed" sx={{ zIndex: (t) => t.zIndex.drawer + 1 }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
-          <Typography variant="h6" fontWeight={700} letterSpacing={1}>
-            Configurator
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+            <img src={logo} alt="" style={{ width: 24, height: 24, filter: "brightness(0) invert(1)", opacity: 0.9 }} />
+            <Typography variant="h6" fontWeight={700} letterSpacing={1}>Portmaster</Typography>
+          </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             {activeBuild && (
               <Chip

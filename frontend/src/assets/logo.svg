@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Anchor ring at top -->
+  <circle cx="16" cy="7" r="3" stroke="currentColor" stroke-width="2.2" fill="none"/>
+  <!-- Vertical shaft -->
+  <line x1="16" y1="10" x2="16" y2="26" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Crossbar -->
+  <line x1="9" y1="14" x2="23" y2="14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Left arm curve -->
+  <path d="M16 26 Q9 26 8 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <!-- Right arm curve -->
+  <path d="M16 26 Q23 26 24 20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+  <!-- Left tip dot -->
+  <circle cx="8" cy="20" r="1.8" fill="currentColor"/>
+  <!-- Right tip dot -->
+  <circle cx="24" cy="20" r="1.8" fill="currentColor"/>
+</svg>

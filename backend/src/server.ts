@@ -50,7 +50,7 @@ await app.register(dashboardRoutes, { cfg });
 await app.register(apacheRoutes, { cfg });
 await app.register(webhookRoutes, { db, cfg });
 await app.register(userRoutes, { db });
-await app.register(configRoutes, { db });
+await app.register(configRoutes, { db, cfg });
 
 // Initialize build queue (marks interrupted runs as failed, re-queues pending)
 buildQueue.loadFromDb(db, cfg.agent.socket, cfg);

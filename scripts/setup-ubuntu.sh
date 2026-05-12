@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # confnode Ubuntu setup script
-# Usage: sudo bash setup-ubuntu.sh
-# Re-running upgrades confnode without touching your config.
+# Usage:        sudo bash setup-ubuntu.sh          # fresh install
+# Update only:  sudo bash setup-ubuntu.sh --update # skip questions, rebuild & restart
 
 set -euo pipefail
 
@@ -15,10 +15,12 @@ title() { echo -e "\n${BOLD}$*${NC}"; }
 INSTALL_DIR=/usr/lib/configurator
 REPO_URL=https://github.com/sigcode/confnode.git
 BUILD_DIR=/tmp/confnode-build
+UPDATE_ONLY=0
+[[ "${1:-}" == "--update" ]] && UPDATE_ONLY=1
 
 # ─── Phase 1: Preflight ───────────────────────────────────────────────────────
 
-title "confnode — Ubuntu Installer"
+title "confnode — Ubuntu ${UPDATE_ONLY:+Updater}${UPDATE_ONLY:-Installer}"
 
 if [[ $EUID -ne 0 ]]; then
   error "Run as root: sudo bash $0"
@@ -35,42 +37,56 @@ if ! curl -s --max-time 5 https://github.com &>/dev/null; then
   exit 1
 fi
 
-# ─── Phase 2: Questions ───────────────────────────────────────────────────────
+# ─── Phase 2: Questions (skipped on --update) ─────────────────────────────────
 
-title "Configuration"
+if [[ $UPDATE_ONLY -eq 1 ]]; then
+  if [[ ! -f /etc/configurator/config.yaml ]]; then
+    error "No existing install found (/etc/configurator/config.yaml missing). Run without --update for a fresh install."
+    exit 1
+  fi
+  info "Update mode — skipping configuration questions."
+  # Read PHP versions from existing config for dependency install
+  PHP_VERSIONS=$(grep -A5 'versions:' /etc/configurator/config.yaml | grep -oP '"[0-9]+\.[0-9]+"' | tr -d '"' | tr '\n' ' ' || echo "8.1 8.3 8.4")
+  PHP_DEFAULT=$(grep 'default:' /etc/configurator/config.yaml | grep -oP '"[0-9]+\.[0-9]+"' | tr -d '"' | head -1 || echo "8.4")
+  CERTBOT_EMAIL=""
+  TOOL_DOMAIN=""
+  ADMIN_PASS=""
+else
+  title "Configuration"
 
-read -rp "Email for Let's Encrypt (certbot): " CERTBOT_EMAIL
-if [[ -z "$CERTBOT_EMAIL" ]]; then
-  error "Certbot email is required."
-  exit 1
-fi
+  read -rp "Email for Let's Encrypt (certbot): " CERTBOT_EMAIL
+  if [[ -z "$CERTBOT_EMAIL" ]]; then
+    error "Certbot email is required."
+    exit 1
+  fi
 
-read -rp "Subdomain for this tool (e.g. conf.yourdomain.com): " TOOL_DOMAIN
-if [[ -z "$TOOL_DOMAIN" ]]; then
-  error "Subdomain is required."
-  exit 1
-fi
+  read -rp "Subdomain for this tool (e.g. conf.yourdomain.com): " TOOL_DOMAIN
+  if [[ -z "$TOOL_DOMAIN" ]]; then
+    error "Subdomain is required."
+    exit 1
+  fi
 
-read -rsp "Admin password (input hidden): " ADMIN_PASS
-echo
-if [[ -z "$ADMIN_PASS" ]]; then
-  error "Admin password is required."
-  exit 1
-fi
+  read -rsp "Admin password (input hidden): " ADMIN_PASS
+  echo
+  if [[ -z "$ADMIN_PASS" ]]; then
+    error "Admin password is required."
+    exit 1
+  fi
 
-read -rp "PHP versions to install [default: 8.1 8.3 8.4]: " PHP_INPUT
-PHP_VERSIONS="${PHP_INPUT:-8.1 8.3 8.4}"
-PHP_DEFAULT=$(echo "$PHP_VERSIONS" | awk '{print $NF}')
+  read -rp "PHP versions to install [default: 8.1 8.3 8.4]: " PHP_INPUT
+  PHP_VERSIONS="${PHP_INPUT:-8.1 8.3 8.4}"
+  PHP_DEFAULT=$(echo "$PHP_VERSIONS" | awk '{print $NF}')
 
-echo
-info "Installing confnode with:"
-info "  Domain    : $TOOL_DOMAIN"
-info "  Email     : $CERTBOT_EMAIL"
-info "  PHP       : $PHP_VERSIONS"
-echo
-read -rp "Proceed? [Y/n]: " CONFIRM
-if [[ "${CONFIRM,,}" == "n" ]]; then
-  echo "Aborted."; exit 0
+  echo
+  info "Installing confnode with:"
+  info "  Domain    : $TOOL_DOMAIN"
+  info "  Email     : $CERTBOT_EMAIL"
+  info "  PHP       : $PHP_VERSIONS"
+  echo
+  read -rp "Proceed? [Y/n]: " CONFIRM
+  if [[ "${CONFIRM,,}" == "n" ]]; then
+    echo "Aborted."; exit 0
+  fi
 fi
 
 # ─── Phase 3: Dependencies ────────────────────────────────────────────────────
@@ -254,11 +270,13 @@ cp "$BUILD_DIR/deploy/configurator-agent.service" /etc/systemd/system/
 cp "$BUILD_DIR/deploy/configurator.service"        /etc/systemd/system/
 
 # Set admin password via drop-in (used on first start by ensureAdminUser)
-mkdir -p /etc/systemd/system/configurator.service.d
-cat > /etc/systemd/system/configurator.service.d/admin.conf <<EOF
+if [[ $UPDATE_ONLY -eq 0 ]]; then
+  mkdir -p /etc/systemd/system/configurator.service.d
+  cat > /etc/systemd/system/configurator.service.d/admin.conf <<EOF
 [Service]
 Environment=ADMIN_PASSWORD=$ADMIN_PASS
 EOF
+fi
 
 systemctl daemon-reload
 systemctl enable configurator-agent configurator
@@ -268,9 +286,43 @@ systemctl restart configurator
 
 info "Services started"
 
-# ─── Phase 8: Apache Proxy Vhost ──────────────────────────────────────────────
+# ─── Phase 8: Apache Proxy Vhost (skipped on --update) ───────────────────────
+
+if [[ $UPDATE_ONLY -eq 1 ]]; then
+  echo
+  echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════╗${NC}"
+  echo -e "${GREEN}${BOLD}║   confnode updated successfully! ✅           ║${NC}"
+  echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════╝${NC}"
+  echo
+  echo "  Service status:"
+  systemctl is-active --quiet configurator-agent && echo -e "    configurator-agent  ${GREEN}active${NC}" || echo -e "    configurator-agent  ${RED}FAILED${NC}"
+  if systemctl is-active --quiet configurator; then
+    echo -e "    configurator        ${GREEN}active${NC}"
+  else
+    echo -e "    configurator        ${RED}FAILED${NC}"
+    echo
+    echo -e "${YELLOW}Last journal entries for configurator:${NC}"
+    journalctl -u configurator --no-pager -n 15 --output=short
+  fi
+  echo
+  exit 0
+fi
 
 title "Setting up Apache reverse proxy"
+
+# Use the server's public IP in the VirtualHost so it lands in the IP-specific
+# NameVirtualHost group, which takes priority over wildcard *:80 groups that
+# other vhosts (e.g. old hostname-syntax VirtualHost directives) may create.
+SERVER_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null \
+  || hostname -I 2>/dev/null | awk '{print $1}')
+if [[ -z "$SERVER_IP" ]]; then
+  warn "Could not detect public IP — falling back to *:80"
+  SERVER_IP="*"
+fi
+info "VirtualHost IP: $SERVER_IP"
+
+# Ensure .well-known dir exists for certbot webroot challenge
+mkdir -p /var/www/html/.well-known/acme-challenge
 
 VHOST_FILE="/etc/apache2/sites-available/configurator.conf"
 CREATE_VHOST=1
@@ -282,10 +334,10 @@ fi
 
 if [[ $CREATE_VHOST -eq 1 ]]; then
   cat > "$VHOST_FILE" <<EOF
-<VirtualHost *:80>
+<VirtualHost ${SERVER_IP}:80>
     ServerName $TOOL_DOMAIN
 
-    # Let certbot serve ACME challenges directly (not via proxy)
+    # Serve ACME challenges directly — must come before ProxyPass
     Alias /.well-known/ /var/www/html/.well-known/
     <Directory /var/www/html/.well-known/>
         Options None
@@ -305,7 +357,7 @@ EOF
   a2ensite configurator
   apache2ctl configtest
   systemctl reload apache2
-  info "Proxy vhost created for $TOOL_DOMAIN"
+  info "Proxy vhost created for $TOOL_DOMAIN (${SERVER_IP}:80)"
 else
   warn "Skipped vhost creation."
 fi
@@ -315,14 +367,44 @@ fi
 title "Obtaining SSL certificate"
 
 if systemctl is-active --quiet apache2; then
-  certbot --apache \
+  # Use webroot mode: avoids the certbot --apache plugin touching vhost configs,
+  # which can conflict with IP-specific NameVirtualHost groups on busy servers.
+  certbot certonly \
+    --webroot \
+    -w /var/www/html \
     --non-interactive \
     --agree-tos \
     --keep-until-expiring \
     --email "$CERTBOT_EMAIL" \
-    -d "$TOOL_DOMAIN" && info "SSL certificate obtained." || warn "Certbot failed — check that DNS for $TOOL_DOMAIN points to this server."
+    -d "$TOOL_DOMAIN" && info "SSL certificate obtained." \
+    || warn "Certbot failed — check that DNS for $TOOL_DOMAIN points to this server."
 else
-  warn "Apache is not running, skipping certbot. Run manually: certbot --apache -d $TOOL_DOMAIN"
+  warn "Apache is not running, skipping certbot. Run manually:"
+  warn "  certbot certonly --webroot -w /var/www/html -d $TOOL_DOMAIN --email $CERTBOT_EMAIL --agree-tos"
+fi
+
+# Add SSL vhost if cert was obtained
+CERT_PATH="/etc/letsencrypt/live/$TOOL_DOMAIN/fullchain.pem"
+if [[ -f "$CERT_PATH" ]] && [[ $CREATE_VHOST -eq 1 ]]; then
+  cat >> "$VHOST_FILE" <<EOF
+
+<VirtualHost ${SERVER_IP}:443>
+    ServerName $TOOL_DOMAIN
+
+    SSLEngine on
+    SSLCertificateFile      /etc/letsencrypt/live/$TOOL_DOMAIN/fullchain.pem
+    SSLCertificateKeyFile   /etc/letsencrypt/live/$TOOL_DOMAIN/privkey.pem
+    Include                 /etc/letsencrypt/options-ssl-apache.conf
+
+    ProxyPreserveHost On
+    ProxyPass        / http://127.0.0.1:3001/
+    ProxyPassReverse / http://127.0.0.1:3001/
+
+    ErrorLog  \${APACHE_LOG_DIR}/configurator-ssl-error.log
+    CustomLog \${APACHE_LOG_DIR}/configurator-ssl-access.log combined
+</VirtualHost>
+EOF
+  apache2ctl configtest && systemctl reload apache2 && info "SSL vhost added."
 fi
 
 # ─── Phase 10: Cleanup ────────────────────────────────────────────────────────
@@ -345,7 +427,7 @@ echo -e "  URL    : ${BOLD}https://$TOOL_DOMAIN${NC}"
 echo -e "  Login  : ${BOLD}admin${NC} / (password as entered)"
 echo
 echo "  Existing Apache vhosts are auto-discovered — no import step needed."
-echo "  To update confnode later, re-run this script."
+echo "  To update confnode later: sudo bash setup-ubuntu.sh --update"
 echo
 echo "  Service status:"
 systemctl is-active --quiet configurator-agent && echo -e "    configurator-agent  ${GREEN}active${NC}" || echo -e "    configurator-agent  ${RED}FAILED${NC}"

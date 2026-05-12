@@ -3,6 +3,7 @@ import { Box, Card, CardContent, TextField, Button, Typography, Alert } from "@m
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch } from "../store/index.js";
 import { login } from "../store/authSlice.js";
+import logo from "../assets/logo.svg";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -30,9 +31,10 @@ export default function Login() {
     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
       <Card sx={{ width: 360 }}>
         <CardContent sx={{ p: 4 }}>
-          <Typography variant="h5" fontWeight={700} mb={3} textAlign="center">
-            Configurator
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mb: 3 }}>
+            <img src={logo} alt="" style={{ width: 32, height: 32, opacity: 0.9 }} />
+            <Typography variant="h5" fontWeight={700}>Portmaster</Typography>
+          </Box>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <Box component="form" onSubmit={submit} sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)}

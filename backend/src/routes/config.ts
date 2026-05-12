@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { Db } from "../db/schema.js";
+import { AppConfig } from "../config.js";
 
 // Settings stored in DB (user-editable via UI)
 const KNOWN_KEYS = ["git.ssh_key", "git.timeout_minutes"] as const;
@@ -32,12 +33,16 @@ export function getGitTimeoutMs(db: Db): number {
   return 600_000; // 10 min default
 }
 
-export default async function configRoutes(app: FastifyInstance, { db }: { db: Db }) {
+export default async function configRoutes(app: FastifyInstance, { db, cfg }: { db: Db; cfg: AppConfig }) {
   app.get("/api/config", async () => {
     return {
       git: {
         ssh_key: getSetting(db, "git.ssh_key") ?? "",
         timeout_minutes: getSetting(db, "git.timeout_minutes") ?? "",
+      },
+      php: {
+        versions: cfg.php.versions,
+        default: cfg.php.default,
       },
     };
   });

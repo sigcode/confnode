@@ -8,7 +8,10 @@ import {
 import Editor from "@monaco-editor/react";
 import api from "../../api/client.js";
 
-const PHP_VERSIONS = ["8.4", "8.3", "8.1"];
+function detectPhpVersion(content: string): string | null {
+  const m = content.match(/php(\d+\.\d+)-fpm\.sock/);
+  return m ? m[1] : null;
+}
 
 interface Props {
   name: string;     // empty string = new vhost
@@ -21,25 +24,63 @@ export default function VhostEditor({ name, onDone }: Props) {
   const [vhostName, setVhostName] = useState(name);
   const [content, setContent] = useState("");
   const [description, setDescription] = useState("");
+  const [phpVersions, setPhpVersions] = useState<string[]>([]);
+  const [phpDefault, setPhpDefault] = useState("8.4");
   const [phpVersion, setPhpVersion] = useState("8.4");
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    api.get("/config").then((r) => {
+      const versions: string[] = r.data.php?.versions ?? ["8.4"];
+      const def: string = r.data.php?.default ?? versions[0];
+      setPhpVersions(versions);
+      setPhpDefault(def);
+      setPhpVersion(def);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!isNew) {
       api.get(`/vhosts/${name}`).then((r) => {
-        setContent(r.data.content);
+        const c: string = r.data.content;
+        setContent(c);
         setDescription(r.data.description ?? "");
+        const detected = detectPhpVersion(c);
+        if (detected) setPhpVersion(detected);
         setLoading(false);
       }).catch((e) => {
         setError(e.response?.data?.error ?? e.message);
         setLoading(false);
       });
     } else {
-      setContent(DEFAULT_TEMPLATE);
+      setLoading(false);
     }
   }, [name, isNew]);
+
+  const template = `<VirtualHost *:80>
+    ServerName example.com
+    DocumentRoot /var/www/example
+
+    <FilesMatch \\.php$>
+        SetHandler "proxy:unix:/run/php/php${phpDefault}-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    <Directory /var/www/example>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/example-error.log
+    CustomLog \${APACHE_LOG_DIR}/example-access.log combined
+</VirtualHost>
+`;
+
+  useEffect(() => {
+    if (isNew && phpDefault) setContent(template);
+  }, [phpDefault]);
 
   const save = async () => {
     setSaving(true);
@@ -92,7 +133,7 @@ export default function VhostEditor({ name, onDone }: Props) {
             <>
               <TextField label="PHP Version" select value={phpVersion} size="small"
                 onChange={(e) => setPhpVersion(e.target.value)} sx={{ width: 130 }}>
-                {PHP_VERSIONS.map((v) => <MenuItem key={v} value={v}>PHP {v}</MenuItem>)}
+                {phpVersions.map((v) => <MenuItem key={v} value={v}>PHP {v}</MenuItem>)}
               </TextField>
               <Button variant="outlined" size="small" onClick={changePhp} disabled={saving}>
                 Switch PHP
@@ -120,21 +161,3 @@ export default function VhostEditor({ name, onDone }: Props) {
   );
 }
 
-const DEFAULT_TEMPLATE = `<VirtualHost *:80>
-    ServerName example.com
-    DocumentRoot /var/www/example
-
-    <FilesMatch \\.php$>
-        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
-    </FilesMatch>
-
-    <Directory /var/www/example>
-        Options -Indexes +FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    ErrorLog \${APACHE_LOG_DIR}/example-error.log
-    CustomLog \${APACHE_LOG_DIR}/example-access.log combined
-</VirtualHost>
-`;
