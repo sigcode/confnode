@@ -74,6 +74,18 @@ func ApacheConfigtest() (string, error) {
 	return runCmd("apachectl", "configtest")
 }
 
+func ApacheDeleteVhost(cfg *config.Config, name string) (string, error) {
+	if err := validator.ValidateSiteName(name); err != nil {
+		return "", err
+	}
+	apacheDisableSiteArch(cfg, name) // best-effort, ignore error
+	path := filepath.Join(cfg.Apache.SitesAvailable, name+".conf")
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return "", fmt.Errorf("cannot delete vhost %q: %v", name, err)
+	}
+	return fmt.Sprintf("deleted %s", path), nil
+}
+
 func ApacheReadVhost(cfg *config.Config, name string) (string, error) {
 	if err := validator.ValidateSiteName(name); err != nil {
 		return "", err

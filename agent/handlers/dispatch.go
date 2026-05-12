@@ -25,6 +25,8 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 		return ApacheControl(cfg, "restart")
 	case "apache.configtest":
 		return ApacheConfigtest()
+	case "apache.delete_vhost":
+		return ApacheDeleteVhost(cfg, p("name"))
 	case "apache.read_vhost":
 		return ApacheReadVhost(cfg, p("name"))
 	case "apache.write_vhost":

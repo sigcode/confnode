@@ -72,12 +72,10 @@ export default async function vhostRoutes(
   // Delete vhost (disable + remove file)
   app.delete<{ Params: { name: string } }>("/api/vhosts/:name", async (req, reply) => {
     const { name } = req.params;
-    await agentCall(socket, "apache.disable_site", { name });
-    // Remove the file via write with empty — agent will reject empty,
-    // so we use a dedicated approach: overwrite with marker then let user decide.
-    // For safety, we just disable and remove from DB; file stays on disk.
+    const res = await agentCall(socket, "apache.delete_vhost", { name });
+    if (!res.ok) return reply.status(500).send({ error: res.error });
     db.prepare("DELETE FROM vhosts WHERE name = ?").run(name);
-    return { ok: true, note: "disabled and removed from DB; .conf file preserved on disk" };
+    return { ok: true };
   });
 
   // Enable / disable
