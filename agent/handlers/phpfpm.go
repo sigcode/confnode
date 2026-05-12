@@ -2,23 +2,31 @@ package handlers
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sigcode/confnode/agent/config"
 	"github.com/sigcode/confnode/agent/validator"
 )
 
+// phpFPMUnit returns the systemd unit name for a PHP-FPM version.
+// Arch: php81-fpm (no dot), Debian/Ubuntu: php8.1-fpm (with dot).
+func phpFPMUnit(cfg *config.Config, version string) string {
+	if cfg.Apache.Mode == "arch" {
+		return fmt.Sprintf("php%s-fpm", strings.ReplaceAll(version, ".", ""))
+	}
+	return fmt.Sprintf("php%s-fpm", version)
+}
+
 func PHPFPMRestart(cfg *config.Config, version string) (string, error) {
 	if err := validator.ValidatePHPVersion(version, cfg.PHP.Versions); err != nil {
 		return "", err
 	}
-	unit := fmt.Sprintf("php%s-fpm", version)
-	return runCmd("systemctl", "restart", unit)
+	return runCmd("systemctl", "restart", phpFPMUnit(cfg, version))
 }
 
 func PHPFPMStatus(cfg *config.Config, version string) (string, error) {
 	if err := validator.ValidatePHPVersion(version, cfg.PHP.Versions); err != nil {
 		return "", err
 	}
-	unit := fmt.Sprintf("php%s-fpm", version)
-	return ServiceStatus(unit)
+	return ServiceStatus(phpFPMUnit(cfg, version))
 }
