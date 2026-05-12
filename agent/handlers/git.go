@@ -47,3 +47,14 @@ func GitCheckout(cfg *config.Config, path, branch, sshKeyOverride string) (strin
 	}
 	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "checkout", branch)
 }
+
+func GitSubmoduleUpdate(cfg *config.Config, path, sshKeyOverride string) (string, error) {
+	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
+		return "", err
+	}
+	key := resolveSSHKey(cfg, sshKeyOverride)
+	if _, err := runGitCmd(path, key, "submodule", "init"); err != nil {
+		return "", err
+	}
+	return runGitCmd(path, key, "submodule", "update", "--recursive")
+}

@@ -59,6 +59,8 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 		return GitPull(cfg, p("path"), p("ssh_key"))
 	case "git.checkout":
 		return GitCheckout(cfg, p("path"), p("branch"), p("ssh_key"))
+	case "git.submodule_update":
+		return GitSubmoduleUpdate(cfg, p("path"), p("ssh_key"))
 
 	// Systemd (generic)
 	case "systemd.status":

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   DialogTitle, DialogContent, DialogActions, Button, TextField,
   Box, Alert, LinearProgress, InputAdornment, IconButton, Tooltip,
+  FormControlLabel, Checkbox,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import api from "../../api/client.js";
@@ -14,6 +15,7 @@ interface Build {
   deploy_path: string;
   build_key: string;
   post_command: string | null;
+  has_submodules: number;
 }
 
 interface Props {
@@ -27,8 +29,9 @@ export default function BuildForm({ build, onDone }: Props) {
     name: build?.name ?? "",
     repo_url: build?.repo_url ?? "",
     repo_branch: build?.repo_branch ?? "main",
-    deploy_path: build?.deploy_path ?? "/var/www/",
+    deploy_path: build?.deploy_path ?? "/srv/http/",
     post_command: build?.post_command ?? "",
+    has_submodules: !!(build?.has_submodules),
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,15 @@ export default function BuildForm({ build, onDone }: Props) {
             placeholder="/var/www/mysite" fullWidth required />
           <TextField label="Post Command (optional)" value={form.post_command}
             onChange={set("post_command")} placeholder="npm install && npm run build" fullWidth />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.has_submodules}
+                onChange={(e) => setForm((f) => ({ ...f, has_submodules: e.target.checked }))}
+              />
+            }
+            label="Has submodules (runs git submodule init && update after clone/pull)"
+          />
 
           {webhookUrl && (
             <TextField

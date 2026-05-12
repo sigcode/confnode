@@ -12,6 +12,7 @@ interface BuildBody {
   repo_branch?: string;
   deploy_path: string;
   post_command?: string;
+  has_submodules?: boolean;
 }
 
 export default async function buildRoutes(
@@ -32,24 +33,24 @@ export default async function buildRoutes(
   });
 
   app.post<{ Body: BuildBody }>("/api/builds", async (req, reply) => {
-    const { name, repo_url, repo_branch = "main", deploy_path, post_command } = req.body;
+    const { name, repo_url, repo_branch = "main", deploy_path, post_command, has_submodules = false } = req.body;
     if (!name || !repo_url || !deploy_path)
       return reply.status(400).send({ error: "name, repo_url, deploy_path required" });
 
     const build_key = nanoid(24);
     const result = db.prepare(`
-      INSERT INTO builds (name, repo_url, repo_branch, deploy_path, build_key, post_command)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(name, repo_url, repo_branch, deploy_path, build_key, post_command ?? null);
+      INSERT INTO builds (name, repo_url, repo_branch, deploy_path, build_key, post_command, has_submodules)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name, repo_url, repo_branch, deploy_path, build_key, post_command ?? null, has_submodules ? 1 : 0);
 
     return db.prepare("SELECT * FROM builds WHERE id = ?").get(result.lastInsertRowid);
   });
 
   app.put<{ Params: { id: string }; Body: BuildBody }>("/api/builds/:id", async (req, reply) => {
-    const { name, repo_url, repo_branch = "main", deploy_path, post_command } = req.body;
+    const { name, repo_url, repo_branch = "main", deploy_path, post_command, has_submodules = false } = req.body;
     db.prepare(`
-      UPDATE builds SET name=?, repo_url=?, repo_branch=?, deploy_path=?, post_command=? WHERE id=?
-    `).run(name, repo_url, repo_branch, deploy_path, post_command ?? null, req.params.id);
+      UPDATE builds SET name=?, repo_url=?, repo_branch=?, deploy_path=?, post_command=?, has_submodules=? WHERE id=?
+    `).run(name, repo_url, repo_branch, deploy_path, post_command ?? null, has_submodules ? 1 : 0, req.params.id);
     return db.prepare("SELECT * FROM builds WHERE id = ?").get(req.params.id);
   });
 
@@ -112,6 +113,17 @@ export default async function buildRoutes(
         ssh_key: sshKey,
       });
       (checkoutRes.output ?? "").split("\n").forEach(send);
+
+      // Submodules
+      if (build.has_submodules) {
+        send("Updating submodules...");
+        const subRes = await agentCall(socket, "git.submodule_update", {
+          path: build.deploy_path,
+          ssh_key: sshKey,
+        });
+        (subRes.output ?? "").split("\n").forEach(send);
+        if (!subRes.ok) throw new Error(subRes.error ?? "submodule update failed");
+      }
 
       // Post command (runs directly in shell as web user — no privileged ops here)
       if (build.post_command) {

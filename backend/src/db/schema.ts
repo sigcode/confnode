@@ -12,7 +12,12 @@ export function openDb(path: string): Db {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   migrate(db);
+  runMigrations(db);
   return db;
+}
+
+function runMigrations(db: Db) {
+  try { db.exec("ALTER TABLE builds ADD COLUMN has_submodules INTEGER NOT NULL DEFAULT 0"); } catch {}
 }
 
 function migrate(db: Db) {
@@ -32,8 +37,10 @@ function migrate(db: Db) {
       deploy_path   TEXT NOT NULL,
       build_key     TEXT NOT NULL UNIQUE,
       post_command  TEXT,
+      has_submodules INTEGER NOT NULL DEFAULT 0,
       created_at    TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
 
     CREATE TABLE IF NOT EXISTS build_runs (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,

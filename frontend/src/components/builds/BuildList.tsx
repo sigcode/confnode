@@ -21,6 +21,7 @@ interface Build {
   deploy_path: string;
   build_key: string;
   post_command: string | null;
+  has_submodules: number;
 }
 
 export default function BuildList() {
