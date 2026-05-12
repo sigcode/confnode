@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sigcode/confnode/agent/config"
@@ -21,6 +24,9 @@ func GitClone(cfg *config.Config, url, path, sshKeyOverride string) (string, err
 	}
 	if err := validator.ValidateDeployPath(path); err != nil {
 		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", fmt.Errorf("cannot create parent directory: %v", err)
 	}
 	return runGitCmd("", resolveSSHKey(cfg, sshKeyOverride), "clone", url, path)
 }
