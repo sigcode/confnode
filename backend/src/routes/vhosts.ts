@@ -186,6 +186,8 @@ function generateVhostConfig(domain: string, path: string, phpVersion: string, a
         SetHandler "proxy:unix:${fpmSocket}|fcgi://localhost"
     </FilesMatch>
 
+    DirectoryIndex index.php index.html
+
     <Directory ${path}>
         Options -Indexes +FollowSymLinks
         AllowOverride All
