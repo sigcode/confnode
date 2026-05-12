@@ -1,6 +1,6 @@
 # Maintainer: Simon Günther <sguenther@sigcode.de>
 pkgname=confnode-git
-pkgver=r6.2746ad9
+pkgver=r8.2f68b4e
 pkgrel=1
 pkgdesc="Personal server administration tool — Apache/vhost management, builds, dashboard"
 arch=('x86_64')
@@ -21,6 +21,8 @@ makedepends=(
 optdepends=(
     'nginx: reverse proxy in front of the backend'
     'mariadb: database service management in the dashboard'
+    'php81-fpm: PHP 8.1 FPM support (AUR)'
+    'php83-fpm: PHP 8.3 FPM support (AUR)'
 )
 backup=('etc/configurator/config.yaml')
 install=confnode.install
