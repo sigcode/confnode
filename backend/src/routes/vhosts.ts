@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { readdirSync, existsSync } from "fs";
+import { readdirSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { Db } from "../db/schema.js";
 import { agentCall } from "../agent.js";
@@ -35,10 +35,20 @@ export default async function vhostRoutes(
 
     return files.map((file) => {
       const name = file.replace(/\.conf$/, "");
+      let serverName: string | null = null;
+      let hasSSL = false;
+      try {
+        const content = readFileSync(join(sitesAvail, file), "utf8");
+        const m = content.match(/^\s*ServerName\s+(\S+)/m);
+        if (m) serverName = m[1];
+        hasSSL = /SSLCertificateFile/i.test(content);
+      } catch {}
       return {
         name,
         enabled: enabledFiles.has(file),
         description: metaMap[name]?.description ?? null,
+        serverName,
+        hasSSL,
       };
     });
   });
@@ -57,6 +67,14 @@ export default async function vhostRoutes(
     const { name } = req.params;
     const { content, description } = req.body;
     if (!content) return reply.status(400).send({ error: "content required" });
+
+    // Warn if ServerName doesn't look like a FQDN
+    const snMatch = content.match(/^\s*ServerName\s+(\S+)/m);
+    if (snMatch) {
+      const sn = snMatch[1];
+      if (!sn.includes("."))
+        return reply.status(400).send({ error: `ServerName "${sn}" looks like a short hostname, not a FQDN. Use the full domain (e.g. ${sn}.example.com).` });
+    }
 
     const res = await agentCall(socket, "apache.write_vhost", { name, content });
     if (!res.ok) return reply.status(400).send({ error: res.error });
@@ -115,11 +133,11 @@ export default async function vhostRoutes(
     }
   );
 
-  // Issue SSL certificate via certbot
-  app.post<{ Params: { name: string }; Body: { domain: string } }>(
-    "/api/vhosts/:name/ssl",
+  // Issue SSL certificate via certbot (SSE stream, GET so EventSource works)
+  app.get<{ Params: { name: string }; Querystring: { domain: string } }>(
+    "/api/vhosts/:name/ssl-stream",
     async (req, reply) => {
-      const { domain } = req.body;
+      const { domain } = req.query;
       // SSE: certbot can take a while — stream output
       reply.raw.setHeader("Content-Type", "text/event-stream");
       reply.raw.setHeader("Cache-Control", "no-cache");

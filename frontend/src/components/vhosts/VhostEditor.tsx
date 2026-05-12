@@ -48,7 +48,10 @@ export default function VhostEditor({ name, onDone }: Props) {
         setContent(c);
         setDescription(r.data.description ?? "");
         const detected = detectPhpVersion(c);
-        if (detected) setPhpVersion(detected);
+        if (detected) {
+          setPhpVersion(detected);
+          setPhpVersions((prev) => prev.includes(detected) ? prev : [detected, ...prev]);
+        }
         setLoading(false);
       }).catch((e) => {
         setError(e.response?.data?.error ?? e.message);
