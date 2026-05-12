@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { agentCall } from "../agent.js";
 import { Db } from "../db/schema.js";
 import { AppConfig } from "../config.js";
-import { getGitSSHKey } from "./config.js";
+import { getGitSSHKey, getGitTimeoutMs } from "./config.js";
 import { exec } from "child_process";
 
 interface BuildBody {
@@ -88,9 +88,10 @@ export default async function buildRoutes(
         .then(() => true).catch(() => false); // just test agent is alive
 
       const sshKey = getGitSSHKey(db);
+      const GIT_TIMEOUT = getGitTimeoutMs(db);
 
       // Check if deploy_path exists → pull, else clone
-      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey })
+      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey }, GIT_TIMEOUT)
         .catch(() => null);
 
       if (!gitAction || !gitAction.ok) {
@@ -99,7 +100,7 @@ export default async function buildRoutes(
           url: build.repo_url,
           path: build.deploy_path,
           ssh_key: sshKey,
-        });
+        }, GIT_TIMEOUT);
         (cloneRes.output ?? "").split("\n").forEach(send);
         if (!cloneRes.ok) throw new Error(cloneRes.error ?? "clone failed");
       } else {
@@ -111,7 +112,7 @@ export default async function buildRoutes(
         path: build.deploy_path,
         branch: build.repo_branch,
         ssh_key: sshKey,
-      });
+      }, GIT_TIMEOUT);
       (checkoutRes.output ?? "").split("\n").forEach(send);
 
       // Submodules
@@ -120,7 +121,7 @@ export default async function buildRoutes(
         const subRes = await agentCall(socket, "git.submodule_update", {
           path: build.deploy_path,
           ssh_key: sshKey,
-        });
+        }, GIT_TIMEOUT);
         (subRes.output ?? "").split("\n").forEach(send);
         if (!subRes.ok) throw new Error(subRes.error ?? "submodule update failed");
       }
@@ -133,12 +134,13 @@ export default async function buildRoutes(
 
       db.prepare("UPDATE build_runs SET status='success', finished_at=datetime('now') WHERE id=?").run(runId);
       send("[DONE] Build successful.");
+      reply.raw.write(`data: ${JSON.stringify({ status: "success" })}\n\n`);
     } catch (e: any) {
       db.prepare("UPDATE build_runs SET status='failed', finished_at=datetime('now') WHERE id=?").run(runId);
       send(`[ERROR] ${e.message}`);
+      reply.raw.write(`data: ${JSON.stringify({ status: "failed" })}\n\n`);
     }
 
-    reply.raw.write("data: [DONE]\n\n");
     reply.raw.end();
   });
 }

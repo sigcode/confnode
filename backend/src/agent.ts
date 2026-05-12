@@ -9,7 +9,8 @@ export interface AgentResponse {
 export async function agentCall(
   socketPath: string,
   cmd: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
+  timeoutMs = 30_000
 ): Promise<AgentResponse> {
   return new Promise((resolve, reject) => {
     const client = createConnection(socketPath);
@@ -35,8 +36,7 @@ export async function agentCall(
       reject(new Error(`agent socket error: ${err.message}`));
     });
 
-    // 30s timeout for long ops (certbot, git clone)
-    client.setTimeout(30_000, () => {
+    client.setTimeout(timeoutMs, () => {
       client.destroy();
       reject(new Error("agent timeout"));
     });

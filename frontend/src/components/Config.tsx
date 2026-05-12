@@ -7,6 +7,7 @@ import api from "../api/client.js";
 
 export default function Config() {
   const [gitSshKey, setGitSshKey] = useState("");
+  const [gitTimeout, setGitTimeout] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -15,6 +16,7 @@ export default function Config() {
   useEffect(() => {
     api.get("/config").then((r) => {
       setGitSshKey(r.data.git?.ssh_key ?? "");
+      setGitTimeout(r.data.git?.timeout_minutes ?? "");
     }).finally(() => setLoading(false));
   }, []);
 
@@ -23,7 +25,7 @@ export default function Config() {
     setSuccess(null);
     setError(null);
     try {
-      await api.put("/config", { git: { ssh_key: gitSshKey } });
+      await api.put("/config", { git: { ssh_key: gitSshKey, timeout_minutes: gitTimeout } });
       setSuccess("Configuration saved.");
     } catch (e: any) {
       setError(e.response?.data?.error ?? e.message);
@@ -55,6 +57,17 @@ export default function Config() {
             placeholder="/root/.ssh/id_ed25519"
             helperText="Leave empty to use the system default or the path set in config.yaml"
             disabled={loading}
+            sx={{ mb: 2 }}
+          />
+          <TextField
+            label="Git Timeout (minutes)"
+            value={gitTimeout}
+            onChange={(e) => setGitTimeout(e.target.value)}
+            fullWidth
+            placeholder="10"
+            helperText="Timeout for git clone/pull operations. Default: 10 minutes."
+            disabled={loading}
+            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
           />
         </CardContent>
       </Card>

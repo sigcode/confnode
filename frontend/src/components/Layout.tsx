@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  AppBar, Toolbar, Typography, IconButton, Tooltip, Divider, Chip,
+  AppBar, Toolbar, Typography, IconButton, Tooltip, Divider, Chip, Dialog,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import DnsIcon from "@mui/icons-material/Dns";
@@ -10,10 +10,13 @@ import PeopleIcon from "@mui/icons-material/People";
 import TuneIcon from "@mui/icons-material/Tune";
 import LogoutIcon from "@mui/icons-material/Logout";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import SyncIcon from "@mui/icons-material/Sync";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../store/index.js";
 import { logout } from "../store/authSlice.js";
+import { openPanel } from "../store/buildSlice.js";
 import ApachePanel from "./apache/ApachePanel.js";
+import BuildLog from "./builds/BuildLog.js";
 
 const DRAWER_WIDTH = 220;
 
@@ -31,6 +34,8 @@ export default function Layout() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((s) => s.auth.user);
   const apacheChanges = useAppSelector((s) => s.apache.changes);
+  const activeBuild = useAppSelector((s) => s.build.active);
+  const buildPanelOpen = useAppSelector((s) => s.build.panelOpen);
   const [apachePanelOpen, setApachePanelOpen] = useState(false);
 
   const handleLogout = async () => {
@@ -46,6 +51,16 @@ export default function Layout() {
             Configurator
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            {activeBuild && (
+              <Chip
+                icon={<SyncIcon sx={activeBuild.status === "running" ? { animation: "spin 1s linear infinite", "@keyframes spin": { "0%": { transform: "rotate(0deg)" }, "100%": { transform: "rotate(360deg)" } } } : {}} />}
+                label={`Build: ${activeBuild.name}`}
+                color={activeBuild.status === "running" ? "info" : activeBuild.status === "success" ? "success" : "error"}
+                size="small"
+                onClick={() => dispatch(openPanel())}
+                sx={{ cursor: "pointer", fontWeight: 600 }}
+              />
+            )}
             {apacheChanges.length > 0 && (
               <Chip
                 icon={<WarningAmberIcon />}
@@ -94,6 +109,10 @@ export default function Layout() {
       </Box>
 
       <ApachePanel open={apachePanelOpen} onClose={() => setApachePanelOpen(false)} />
+
+      <Dialog open={buildPanelOpen} maxWidth="md" fullWidth>
+        <BuildLog />
+      </Dialog>
     </Box>
   );
 }

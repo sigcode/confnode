@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { Db } from "../db/schema.js";
 
 // Settings stored in DB (user-editable via UI)
-const KNOWN_KEYS = ["git.ssh_key"] as const;
+const KNOWN_KEYS = ["git.ssh_key", "git.timeout_minutes"] as const;
 type SettingKey = typeof KNOWN_KEYS[number];
 
 function getSetting(db: Db, key: SettingKey): string | null {
@@ -23,16 +23,26 @@ export function getGitSSHKey(db: Db): string {
   return getSetting(db, "git.ssh_key") ?? "";
 }
 
+export function getGitTimeoutMs(db: Db): number {
+  const v = getSetting(db, "git.timeout_minutes");
+  if (v) {
+    const n = parseInt(v, 10);
+    if (!isNaN(n) && n > 0) return n * 60_000;
+  }
+  return 600_000; // 10 min default
+}
+
 export default async function configRoutes(app: FastifyInstance, { db }: { db: Db }) {
   app.get("/api/config", async () => {
     return {
       git: {
         ssh_key: getSetting(db, "git.ssh_key") ?? "",
+        timeout_minutes: getSetting(db, "git.timeout_minutes") ?? "",
       },
     };
   });
 
-  app.put<{ Body: { git?: { ssh_key?: string } } }>("/api/config", async (req) => {
+  app.put<{ Body: { git?: { ssh_key?: string; timeout_minutes?: string } } }>("/api/config", async (req) => {
     const { git } = req.body;
     if (git !== undefined) {
       if (git.ssh_key !== undefined) {
@@ -40,6 +50,13 @@ export default async function configRoutes(app: FastifyInstance, { db }: { db: D
           deleteSetting(db, "git.ssh_key");
         } else {
           setSetting(db, "git.ssh_key", git.ssh_key.trim());
+        }
+      }
+      if (git.timeout_minutes !== undefined) {
+        if (git.timeout_minutes.trim() === "") {
+          deleteSetting(db, "git.timeout_minutes");
+        } else {
+          setSetting(db, "git.timeout_minutes", git.timeout_minutes.trim());
         }
       }
     }

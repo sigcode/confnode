@@ -10,8 +10,10 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import HistoryIcon from "@mui/icons-material/History";
 import api from "../../api/client.js";
 import BuildForm from "./BuildForm.js";
-import BuildLog from "./BuildLog.js";
 import BuildHistory from "./BuildHistory.js";
+import { runBuild } from "./buildStream.js";
+import { openPanel } from "../../store/buildSlice.js";
+import { useAppDispatch, useAppSelector } from "../../store/index.js";
 
 interface Build {
   id: number;
@@ -25,9 +27,10 @@ interface Build {
 }
 
 export default function BuildList() {
+  const dispatch = useAppDispatch();
+  const activeBuild = useAppSelector((s) => s.build.active);
   const [builds, setBuilds] = useState<Build[]>([]);
   const [formTarget, setFormTarget] = useState<Build | null | "new">(null);
-  const [runTarget, setRunTarget] = useState<Build | null>(null);
   const [historyTarget, setHistoryTarget] = useState<Build | null>(null);
 
   const load = async () => {
@@ -73,8 +76,18 @@ export default function BuildList() {
               <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{b.deploy_path}</TableCell>
               <TableCell align="right">
                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                  <Tooltip title="Run">
-                    <IconButton size="small" color="success" onClick={() => setRunTarget(b)}>
+                  <Tooltip title={activeBuild?.id === b.id ? "Show log" : "Run"}>
+                    <IconButton
+                      size="small"
+                      color="success"
+                      onClick={() => {
+                        if (activeBuild?.id === b.id) {
+                          dispatch(openPanel());
+                        } else {
+                          runBuild(b);
+                        }
+                      }}
+                    >
                       <PlayArrowIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
@@ -114,10 +127,6 @@ export default function BuildList() {
             onDone={() => { setFormTarget(null); load(); }}
           />
         )}
-      </Dialog>
-
-      <Dialog open={runTarget !== null} onClose={() => setRunTarget(null)} maxWidth="md" fullWidth>
-        {runTarget && <BuildLog build={runTarget} onClose={() => setRunTarget(null)} />}
       </Dialog>
 
       <Dialog open={historyTarget !== null} onClose={() => setHistoryTarget(null)} maxWidth="md" fullWidth>
