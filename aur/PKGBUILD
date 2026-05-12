@@ -1,6 +1,6 @@
 # Maintainer: Simon Günther <sguenther@sigcode.de>
 pkgname=confnode-git
-pkgver=r4.7eae058
+pkgver=r6.2746ad9
 pkgrel=1
 pkgdesc="Personal server administration tool — Apache/vhost management, builds, dashboard"
 arch=('x86_64')
@@ -20,7 +20,7 @@ makedepends=(
 )
 optdepends=(
     'nginx: reverse proxy in front of the backend'
-    'mariadb: if you want MySQL service management in the dashboard'
+    'mariadb: database service management in the dashboard'
 )
 backup=('etc/configurator/config.yaml')
 install=confnode.install

@@ -18,11 +18,11 @@ export default async function dashboardRoutes(
         output: r.output ?? r.error,
       })).catch(() => ({ name: "apache2", active: false, output: "unreachable" })),
 
-      agentCall(socket, "mysql.status").then((r) => ({
-        name: "mysql",
+      agentCall(socket, "mariadb.status").then((r) => ({
+        name: "mariadb",
         active: (r.output ?? "").trim() === "active",
         output: r.output ?? r.error,
-      })).catch(() => ({ name: "mysql", active: false, output: "unreachable" })),
+      })).catch(() => ({ name: "mariadb", active: false, output: "unreachable" })),
 
       ...cfg.php.versions.map((v) =>
         agentCall(socket, "phpfpm.status", { version: v })
@@ -49,8 +49,8 @@ export default async function dashboardRoutes(
       let res;
       if (service === "apache2") {
         res = await agentCall(socket, `apache.${action}`);
-      } else if (service === "mysql") {
-        res = await agentCall(socket, `mysql.${action}`);
+      } else if (service === "mariadb") {
+        res = await agentCall(socket, `mariadb.${action}`);
       } else if (service.startsWith("php") && service.endsWith("-fpm")) {
         const version = service.replace("php", "").replace("-fpm", "");
         if (!cfg.php.versions.includes(version))

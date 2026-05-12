@@ -15,10 +15,10 @@ interface Service {
 type Action = "start" | "stop" | "restart" | "reload";
 
 const ACTIONS: Record<string, Action[]> = {
-  apache2: ["restart", "reload", "stop"],
-  mysql: ["restart", "stop"],
+  apache2: ["start", "restart", "reload", "stop"],
+  mariadb: ["start", "restart", "stop"],
 };
-const phpFpmActions: Action[] = ["restart"];
+const phpFpmActions: Action[] = ["start", "restart"];
 
 export default function Dashboard() {
   const [services, setServices] = useState<Service[]>([]);

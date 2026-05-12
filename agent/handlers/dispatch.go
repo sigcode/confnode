@@ -32,13 +32,15 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 	case "phpfpm.status":
 		return PHPFPMStatus(cfg, p("version"))
 
-	// MySQL
-	case "mysql.status":
-		return ServiceStatus("mysql")
-	case "mysql.start":
-		return ServiceControl("mysql", "start")
-	case "mysql.stop":
-		return ServiceControl("mysql", "stop")
+	// MariaDB
+	case "mariadb.status":
+		return ServiceStatus("mariadb")
+	case "mariadb.start":
+		return ServiceControl("mariadb", "start")
+	case "mariadb.stop":
+		return ServiceControl("mariadb", "stop")
+	case "mariadb.restart":
+		return ServiceControl("mariadb", "restart")
 
 	// Certbot
 	case "certbot.issue":
