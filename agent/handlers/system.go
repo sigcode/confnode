@@ -3,7 +3,10 @@ package handlers
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+
+	"github.com/sigcode/confnode/agent/validator"
 )
 
 // runGitCmd runs a git command with an optional SSH key injected via GIT_SSH_COMMAND.
@@ -77,4 +80,15 @@ func ServiceControl(unit, action string) (string, error) {
 
 func errorf(format string, a ...any) error {
 	return fmt.Errorf(format, a...)
+}
+
+// FsRemoveDir removes a directory and all its contents after validating the path.
+func FsRemoveDir(path string, allowedRoots []string) (string, error) {
+	if err := validator.ValidateDeployPath(path, allowedRoots); err != nil {
+		return "", err
+	}
+	if err := os.RemoveAll(path); err != nil {
+		return "", fmt.Errorf("failed to remove %q: %w", path, err)
+	}
+	return fmt.Sprintf("removed %s", path), nil
 }

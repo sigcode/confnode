@@ -62,6 +62,10 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 	case "git.submodule_update":
 		return GitSubmoduleUpdate(cfg, p("path"), p("ssh_key"))
 
+	// Filesystem
+	case "fs.remove_dir":
+		return FsRemoveDir(p("path"), cfg.Git.DeployRoots)
+
 	// Systemd (generic)
 	case "systemd.status":
 		return ServiceStatus(p("unit"))

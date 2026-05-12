@@ -59,6 +59,15 @@ export default async function buildRoutes(
     return { ok: true };
   });
 
+  // Purge deploy directory
+  app.post<{ Params: { id: string } }>("/api/builds/:id/purge", async (req, reply) => {
+    const build = db.prepare("SELECT * FROM builds WHERE id = ?").get(req.params.id) as any;
+    if (!build) return reply.status(404).send({ error: "not found" });
+    const res = await agentCall(socket, "fs.remove_dir", { path: build.deploy_path });
+    if (!res.ok) return reply.status(500).send({ error: res.error ?? "purge failed" });
+    return { ok: true };
+  });
+
   // Trigger a build run — streams output via SSE
   app.post<{ Params: { id: string } }>("/api/builds/:id/run", async (req, reply) => {
     const build = db.prepare("SELECT * FROM builds WHERE id = ?").get(req.params.id) as any;

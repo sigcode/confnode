@@ -1,6 +1,6 @@
 # Maintainer: Simon Günther <sguenther@sigcode.de>
 pkgname=confnode-git
-pkgver=r26.2845d8d
+pkgver=r27.8ce885e
 pkgrel=1
 pkgdesc="Personal server administration tool — Apache/vhost management, builds, dashboard"
 arch=('x86_64')

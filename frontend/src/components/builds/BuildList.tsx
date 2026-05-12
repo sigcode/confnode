@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import {
   Box, Typography, Button, Table, TableHead, TableRow, TableCell,
   TableBody, IconButton, Tooltip, Dialog, Chip, Stack,
+  DialogTitle, DialogContent, DialogContentText, DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import HistoryIcon from "@mui/icons-material/History";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import api from "../../api/client.js";
 import BuildForm from "./BuildForm.js";
 import BuildHistory from "./BuildHistory.js";
@@ -32,6 +34,8 @@ export default function BuildList() {
   const [builds, setBuilds] = useState<Build[]>([]);
   const [formTarget, setFormTarget] = useState<Build | null | "new">(null);
   const [historyTarget, setHistoryTarget] = useState<Build | null>(null);
+  const [purgeTarget, setPurgeTarget] = useState<Build | null>(null);
+  const [purging, setPurging] = useState(false);
 
   const load = async () => {
     const res = await api.get("/builds");
@@ -44,6 +48,17 @@ export default function BuildList() {
     if (!confirm("Delete this build?")) return;
     await api.delete(`/builds/${id}`);
     load();
+  };
+
+  const confirmPurge = async () => {
+    if (!purgeTarget) return;
+    setPurging(true);
+    try {
+      await api.post(`/builds/${purgeTarget.id}/purge`);
+    } finally {
+      setPurging(false);
+      setPurgeTarget(null);
+    }
   };
 
   return (
@@ -101,6 +116,11 @@ export default function BuildList() {
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Tooltip>
+                  <Tooltip title="Purge deploy dir">
+                    <IconButton size="small" color="warning" onClick={() => setPurgeTarget(b)}>
+                      <DeleteSweepIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Delete">
                     <IconButton size="small" color="error" onClick={() => remove(b.id)}>
                       <DeleteIcon fontSize="small" />
@@ -131,6 +151,22 @@ export default function BuildList() {
 
       <Dialog open={historyTarget !== null} onClose={() => setHistoryTarget(null)} maxWidth="md" fullWidth>
         {historyTarget && <BuildHistory build={historyTarget} onClose={() => setHistoryTarget(null)} />}
+      </Dialog>
+
+      <Dialog open={purgeTarget !== null} onClose={() => !purging && setPurgeTarget(null)}>
+        <DialogTitle>Purge deploy directory?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently delete <strong>{purgeTarget?.deploy_path}</strong> and all its contents.
+            The build configuration is kept — you can re-deploy afterwards.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPurgeTarget(null)} disabled={purging}>Cancel</Button>
+          <Button onClick={confirmPurge} color="warning" variant="contained" disabled={purging}>
+            {purging ? "Purging…" : "Purge"}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );
