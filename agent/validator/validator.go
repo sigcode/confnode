@@ -39,7 +39,8 @@ func ValidateDeployPath(path string, allowedRoots []string) error {
 		return fmt.Errorf("deploy path must not contain '..'")
 	}
 	for _, root := range allowedRoots {
-		if strings.HasPrefix(path, root) {
+		// Must be strictly under root, not equal to it
+		if strings.HasPrefix(path, strings.TrimRight(root, "/")+"/") {
 			return nil
 		}
 	}
