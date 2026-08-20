@@ -30,6 +30,10 @@ git:
   # deploy_roots:
   #   - /var/www/
   #   - /srv/http/
+  # User the actual git clone/pull/checkout/submodule-update child processes
+  # drop privileges to (the agent itself stays root for its other duties).
+  # Default: www-data (apache.mode: debian) or http (apache.mode: arch).
+  # deploy_user: www-data
 
 database:
   path: /var/lib/configurator/db.sqlite

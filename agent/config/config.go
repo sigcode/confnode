@@ -17,6 +17,13 @@ type Config struct {
 type GitConfig struct {
 	SSHKeyPath  string   `yaml:"ssh_key"`      // path to private key, e.g. /root/.ssh/id_ed25519
 	DeployRoots []string `yaml:"deploy_roots"` // allowed deploy path prefixes
+	// DeployUser: the agent itself runs as root (needed for Apache/certbot/
+	// systemd), but there's no reason the actual `git clone`/`pull`/
+	// `checkout`/`submodule update` child processes need to inherit that —
+	// they drop to this user first (via setuid/setgid), so files they create
+	// end up owned by the webserver user instead of root. Defaults to
+	// "www-data" (Debian/Ubuntu) or "http" (Arch), matching Apache.Mode.
+	DeployUser string `yaml:"deploy_user"`
 }
 
 type ApacheConfig struct {
@@ -77,5 +84,12 @@ func setDefaults(cfg *Config) {
 	}
 	if len(cfg.Git.DeployRoots) == 0 {
 		cfg.Git.DeployRoots = []string{"/var/www/", "/srv/http/", "/srv/"}
+	}
+	if cfg.Git.DeployUser == "" {
+		if cfg.Apache.Mode == "arch" {
+			cfg.Git.DeployUser = "http"
+		} else {
+			cfg.Git.DeployUser = "www-data"
+		}
 	}
 }

@@ -28,14 +28,14 @@ func GitClone(cfg *config.Config, url, path, sshKeyOverride string) (string, err
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return "", fmt.Errorf("cannot create parent directory: %v", err)
 	}
-	return runGitCmd("", resolveSSHKey(cfg, sshKeyOverride), "clone", url, path)
+	return runGitCmd("", resolveSSHKey(cfg, sshKeyOverride), cfg.Git.DeployUser, "clone", url, path)
 }
 
 func GitPull(cfg *config.Config, path, sshKeyOverride string) (string, error) {
 	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
 		return "", err
 	}
-	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "pull")
+	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), cfg.Git.DeployUser, "pull")
 }
 
 // GitRepoExists reports whether path already contains a git working tree
@@ -66,7 +66,7 @@ func GitCheckout(cfg *config.Config, path, branch, sshKeyOverride string) (strin
 	if branch == "" {
 		return "", errorf("branch must not be empty")
 	}
-	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "checkout", branch)
+	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), cfg.Git.DeployUser, "checkout", branch)
 }
 
 func GitSubmoduleUpdate(cfg *config.Config, path, sshKeyOverride string) (string, error) {
@@ -74,8 +74,9 @@ func GitSubmoduleUpdate(cfg *config.Config, path, sshKeyOverride string) (string
 		return "", err
 	}
 	key := resolveSSHKey(cfg, sshKeyOverride)
-	if _, err := runGitCmd(path, key, "submodule", "init"); err != nil {
+	deployUser := cfg.Git.DeployUser
+	if _, err := runGitCmd(path, key, deployUser, "submodule", "init"); err != nil {
 		return "", err
 	}
-	return runGitCmd(path, key, "submodule", "update", "--recursive")
+	return runGitCmd(path, key, deployUser, "submodule", "update", "--recursive")
 }
