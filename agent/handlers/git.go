@@ -38,6 +38,27 @@ func GitPull(cfg *config.Config, path, sshKeyOverride string) (string, error) {
 	return runGitCmd(path, resolveSSHKey(cfg, sshKeyOverride), "pull")
 }
 
+// GitRepoExists reports whether path already contains a git working tree
+// (i.e. a "<path>/.git" entry). Used by the build queue to decide clone vs.
+// pull from actual filesystem state instead of inferring it from whether a
+// pull happened to succeed — a pull can fail for reasons that have nothing
+// to do with "repo doesn't exist yet" (missing branch tracking, git's
+// safe.directory ownership check, a network blip, ...), and blindly cloning
+// into an already-populated deploy_path on any such failure just crashes
+// with "destination path ... already exists and is not an empty directory."
+func GitRepoExists(cfg *config.Config, path string) (string, error) {
+	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(filepath.Join(path, ".git")); err != nil {
+		if os.IsNotExist(err) {
+			return "false", nil
+		}
+		return "", fmt.Errorf("cannot stat %q: %v", path, err)
+	}
+	return "true", nil
+}
+
 func GitCheckout(cfg *config.Config, path, branch, sshKeyOverride string) (string, error) {
 	if err := validator.ValidateDeployPath(path, cfg.Git.DeployRoots); err != nil {
 		return "", err

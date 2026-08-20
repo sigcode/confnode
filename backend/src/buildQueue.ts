@@ -31,11 +31,20 @@ export async function executeBuild(
     const sshKey = getGitSSHKey(db);
     const GIT_TIMEOUT = getGitTimeoutMs(db);
 
-    const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey }, GIT_TIMEOUT)
-      .catch(() => null);
+    // Clone vs. pull wird anhand des tatsächlichen Zustands des Deploy-Pfads
+    // entschieden (git.exists prüft "<path>/.git"), NICHT anhand von "hat
+    // pull geklappt" — ein pull kann aus vielen Gründen scheitern, ohne dass
+    // das etwas mit "Repo existiert noch nicht" zu tun hat (fehlendes
+    // Branch-Tracking, gits safe.directory-Ownership-Check, Timeout, ...).
+    // Vorher führte genau das dazu, dass ein zweiter Build auf demselben
+    // deploy_path bei jedem pull-Fehler blind einen clone versuchte und mit
+    // "destination path ... already exists and is not an empty directory"
+    // krachte.
+    const existsRes = await agentCall(socket, "git.exists", { path: build.deploy_path }, GIT_TIMEOUT);
+    const repoExists = existsRes.ok && existsRes.output?.trim() === "true";
 
-    if (!gitAction || !gitAction.ok) {
-      log("Directory not found or git pull failed, cloning...");
+    if (!repoExists) {
+      log("No existing repo at deploy path, cloning...");
       const cloneRes = await agentCall(socket, "git.clone", {
         url: build.repo_url,
         path: build.deploy_path,
@@ -44,7 +53,13 @@ export async function executeBuild(
       (cloneRes.output ?? "").split("\n").forEach(log);
       if (!cloneRes.ok) throw new Error(cloneRes.error ?? "clone failed");
     } else {
+      log("Existing repo found, pulling...");
+      const gitAction = await agentCall(socket, "git.pull", { path: build.deploy_path, ssh_key: sshKey }, GIT_TIMEOUT);
       (gitAction.output ?? "").split("\n").forEach(log);
+      // Fehler nicht mehr schlucken: Build schlägt jetzt mit dem echten
+      // pull-Fehlertext (Tracking, Ownership, ...) fehl, statt ihn zu
+      // verstecken und stattdessen blind zu clonen.
+      if (!gitAction.ok) throw new Error(gitAction.error ?? "git pull failed");
     }
 
     const checkoutRes = await agentCall(socket, "git.checkout", {

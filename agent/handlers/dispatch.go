@@ -57,6 +57,8 @@ func Dispatch(cfg *config.Config, cmd string, params map[string]string) (string,
 		return GitClone(cfg, p("url"), p("path"), p("ssh_key"))
 	case "git.pull":
 		return GitPull(cfg, p("path"), p("ssh_key"))
+	case "git.exists":
+		return GitRepoExists(cfg, p("path"))
 	case "git.checkout":
 		return GitCheckout(cfg, p("path"), p("branch"), p("ssh_key"))
 	case "git.submodule_update":
